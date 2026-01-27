@@ -1,0 +1,37 @@
+name: Setup Environment for Copilot Agents
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+jobs:
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c
+
+      - name: Install LSP MCP server
+        run: go install github.com/isaacphi/mcp-language-server@latest
+
+      - name: Checkout sources
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
+
+      - name: Disallow editing of test_project
+        run: git update-index --assume-unchanged test_project/
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244
+        with:
+          activate-environment: true
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups --all-extras

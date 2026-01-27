@@ -1,15 +1,15 @@
-import python_minifier.ast_compat as ast
-from python_minifier.ast_annotation import get_parent, set_parent
+import python_minifier.ast as ast
 
-from python_minifier.rename.binding import Binding
-from python_minifier.rename.util import insert
 from python_minifier.transforms.suite_transformer import NodeVisitor
 from python_minifier.util import is_constant_node
 
+from .binding import Binding
+from .util import insert, utf8_byte_len
+
 
 def replace(old_node, new_node):
-    parent = get_parent(old_node)
-    set_parent(new_node, parent)
+    parent = ast.get_parent(old_node)
+    ast.set_parent(new_node, parent)
     new_node.namespace = old_node.namespace
 
     for field, old_value in ast.iter_fields(parent):
@@ -50,7 +50,7 @@ class HoistedBinding(Binding):
             return self._value_node.value
 
     def __repr__(self):
-        return self.__class__.__name__ + '(value=%r)' % self.value
+        return self.__class__.__name__ + "(value=%r)" % self.value
 
     def new_mention_count(self):
         # All mentions must be literals, which would be replaced
@@ -66,7 +66,6 @@ class HoistedBinding(Binding):
         return 2  # '=' + '\n'
 
     def rename(self, new_name):
-
         for node in self.references:
             replace(node, ast.Name(id=new_name, ctx=ast.Load()))
 
@@ -81,7 +80,11 @@ class HoistedBinding(Binding):
 
     def should_rename(self, new_name):
         current_cost = len(self.references) * len(repr(self.value))
-        rename_cost = (self.old_mention_count() * len(repr(self.value))) + ((self.new_mention_count()) * len(new_name)) + self.additional_byte_cost()
+        rename_cost = (
+            (self.old_mention_count() * len(repr(self.value)))
+            + ((self.new_mention_count()) * utf8_byte_len(new_name))
+            + self.additional_byte_cost()
+        )
 
         return rename_cost <= current_cost
 
@@ -104,7 +107,7 @@ class HoistedValue(object):
         return hash(str(type(self._value)) + str(hash(self._value)))
 
     def __eq__(self, other):
-        return type(self._value) == type(other._value) and self._value == other._value
+        return type(self._value) is type(other._value) and self._value == other._value
 
     def __ne__(self, other):
         return not self == other
@@ -170,7 +173,6 @@ class HoistLiterals(NodeVisitor):
         return path
 
     def common_path(self, n1_path, n2_path):
-
         path = []
         for n1_step, n2_step in zip(n1_path, n2_path):
             if n1_step is not n2_step:
@@ -180,7 +182,6 @@ class HoistLiterals(NodeVisitor):
 
     def place_bindings(self):
         for binding in self._hoisted.values():
-
             namespace_path = []
 
             for node in binding.references:
@@ -202,8 +203,7 @@ class HoistLiterals(NodeVisitor):
         return binding
 
     def visit_Str(self, node):
-
-        if isinstance(get_parent(node), ast.Expr):
+        if isinstance(ast.get_parent(node), ast.Expr):
             # This is literal statement
             # The RemoveLiteralStatements transformer must have left it here, so ignore it.
             return
@@ -247,7 +247,7 @@ class HoistLiterals(NodeVisitor):
             return self.generic_visit(node)
 
         for target in node.targets:
-            if isinstance(target, ast.Name) and target.id == '__slots__':
+            if isinstance(target, ast.Name) and target.id == "__slots__":
                 # This is a __slots__ assignment, don't hoist the literals
                 return None
 

@@ -1,4 +1,4 @@
-import python_minifier.ast_compat as ast
+import python_minifier.ast as ast
 
 from python_minifier.transforms.suite_transformer import SuiteTransformer
 
@@ -12,7 +12,6 @@ class CombineImports(SuiteTransformer):
     """
 
     def _combine_import(self, node_list, parent):
-
         alias = []
         namespace = None
 
@@ -31,7 +30,6 @@ class CombineImports(SuiteTransformer):
             yield self.add_child(ast.Import(names=alias), parent=parent, namespace=namespace)
 
     def _combine_import_from(self, node_list, parent):
-
         prev_import = None
         alias = []
 
@@ -39,7 +37,7 @@ class CombineImports(SuiteTransformer):
             if not isinstance(statement, ast.ImportFrom):
                 return False
 
-            if len(statement.names) == 1 and statement.names[0].name == '*':
+            if len(statement.names) == 1 and statement.names[0].name == "*":
                 return False
 
             if prev_import is None:
@@ -57,7 +55,9 @@ class CombineImports(SuiteTransformer):
             else:
                 if alias:
                     yield self.add_child(
-                        ast.ImportFrom(module=prev_import.module, names=alias, level=prev_import.level), parent=parent, namespace=prev_import.namespace
+                        ast.ImportFrom(module=prev_import.module, names=alias, level=prev_import.level),
+                        parent=parent,
+                        namespace=prev_import.namespace,
                     )
                     alias = []
 
@@ -65,7 +65,9 @@ class CombineImports(SuiteTransformer):
 
         if alias:
             yield self.add_child(
-                ast.ImportFrom(module=prev_import.module, names=alias, level=prev_import.level), parent=parent, namespace=prev_import.namespace
+                ast.ImportFrom(module=prev_import.module, names=alias, level=prev_import.level),
+                parent=parent,
+                namespace=prev_import.namespace,
             )
 
     def suite(self, node_list, parent):

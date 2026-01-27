@@ -6,11 +6,10 @@ a 'minified' representation of the same source code.
 
 import re
 
-import python_minifier.ast_compat as ast
-from python_minifier.ast_annotation import add_parent
+import python_minifier.ast as ast
 
 from python_minifier.ast_compare import CompareError, compare_ast
-from python_minifier.module_printer import ModulePrinter
+from python_minifier.printer import ModulePrinter
 from python_minifier.rename import (
     add_namespace,
     allow_rename_globals,
@@ -18,7 +17,7 @@ from python_minifier.rename import (
     bind_names,
     rename,
     rename_literals,
-    resolve_names
+    resolve_names,
 )
 from python_minifier.transforms.combine_imports import CombineImports
 from python_minifier.transforms.constant_folding import FoldConstants
@@ -50,7 +49,7 @@ class UnstableMinification(RuntimeError):
         self.minified = minified
 
     def __str__(self):
-        return 'Minification was unstable! Please create an issue at https://github.com/dflook/python-minifier/issues'
+        return "Minification was unstable! Please create an issue at https://github.com/dflook/python-minifier/issues"
 
 
 def minify(
@@ -72,7 +71,7 @@ def minify(
     remove_debug=False,
     remove_explicit_return_none=True,
     remove_builtin_exception_brackets=True,
-    constant_folding=True
+    constant_folding=True,
 ):
     """
     Minify a python module
@@ -112,12 +111,12 @@ def minify(
 
     """
 
-    filename = filename or 'python_minifier.minify source'
+    filename = filename or "python_minifier.minify source"
 
     # This will raise if the source file can't be parsed
     module = ast.parse(source, filename)
 
-    add_parent(module)
+    ast.add_parent(module)
     add_namespace(module)
 
     if remove_literal_statements:
@@ -136,7 +135,7 @@ def minify(
     elif isinstance(remove_annotations, RemoveAnnotationsOptions):
         remove_annotations_options = remove_annotations
     else:
-        raise TypeError('remove_annotations must be a bool or RemoveAnnotationsOptions')
+        raise TypeError("remove_annotations must be a bool or RemoveAnnotationsOptions")
 
     if remove_annotations_options:
         module = RemoveAnnotations(remove_annotations_options)(module)
@@ -197,7 +196,7 @@ def minify(
     if preserve_shebang is True:
         shebang_line = _find_shebang(source)
         if shebang_line is not None:
-            return shebang_line + '\n' + minified
+            return shebang_line + "\n" + minified
 
     return minified
 
@@ -208,11 +207,11 @@ def _find_shebang(source):
     """
 
     if isinstance(source, bytes):
-        shebang = re.match(br'^#!.*', source)
+        shebang = re.match(rb"^#!.*", source)
         if shebang:
             return shebang.group().decode()
     else:
-        shebang = re.match(r'^#!.*', source)
+        shebang = re.match(r"^#!.*", source)
         if shebang:
             return shebang.group()
 
@@ -238,14 +237,14 @@ def unparse(module):
     printer(module)
 
     try:
-        minified_module = ast.parse(printer.code, 'python_minifier.unparse output')
+        minified_module = ast.parse(printer.code, "python_minifier.unparse output")
     except SyntaxError as syntax_error:
-        raise UnstableMinification(syntax_error, '', printer.code)
+        raise UnstableMinification(syntax_error, "", printer.code)
 
     try:
         compare_ast(module, minified_module)
     except CompareError as compare_error:
-        raise UnstableMinification(compare_error, '', printer.code)
+        raise UnstableMinification(compare_error, "", printer.code)
 
     return printer.code
 
@@ -270,5 +269,9 @@ def awslambda(source, filename=None, entrypoint=None):
         rename_globals = False
 
     return minify(
-        source, filename, remove_literal_statements=True, rename_globals=rename_globals, preserve_globals=[entrypoint],
+        source,
+        filename,
+        remove_literal_statements=True,
+        rename_globals=rename_globals,
+        preserve_globals=[entrypoint],
     )

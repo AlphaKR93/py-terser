@@ -1,4 +1,4 @@
-import python_minifier.ast_compat as ast
+import python_minifier.ast as ast
 
 
 class CompareError(RuntimeError):
@@ -12,30 +12,30 @@ class CompareError(RuntimeError):
         self.msg = msg
 
     def __repr__(self):
-        return 'NodeError(%r, %r)' % (self.lnode, self.rnode)
+        return "NodeError(%r, %r)" % (self.lnode, self.rnode)
 
     def namespace(self, node):
-        if hasattr(node, 'namespace'):
+        if hasattr(node, "namespace"):
             if isinstance(node.namespace, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
-                return self.namespace(node.namespace) + '.' + node.namespace.name
+                return self.namespace(node.namespace) + "." + node.namespace.name
             elif isinstance(node.namespace, ast.Module):
-                return ''
+                return ""
             else:
                 return repr(node.namespace.__class__)
 
         return None
 
     def __str__(self):
-        error = ''
+        error = ""
 
         if self.msg:
             error += self.msg
 
         if self.namespace(self.lnode):
-            error += ' in namespace ' + self.namespace(self.lnode)
+            error += " in namespace " + self.namespace(self.lnode)
 
-        if self.lnode and hasattr(self.lnode, 'lineno'):
-            error += ' at source %i:%i' % (self.lnode.lineno, self.lnode.col_offset)
+        if self.lnode and hasattr(self.lnode, "lineno"):
+            error += " at source %i:%i" % (self.lnode.lineno, self.lnode.col_offset)
 
         return error
 
@@ -56,19 +56,17 @@ def compare_ast(l_ast, r_ast):
             yield i
             i += 1
 
-    if type(l_ast) != type(r_ast):
-        raise CompareError(l_ast, r_ast, msg='Nodes do not match! %r != %r' % (l_ast, r_ast))
+    if type(l_ast) is not type(r_ast):
+        raise CompareError(l_ast, r_ast, msg="Nodes do not match! %r != %r" % (l_ast, r_ast))
 
     for field in sorted(set(l_ast._fields + r_ast._fields)):
-
-        if field == 'kind' and isinstance(l_ast, ast.Constant):
+        if field == "kind" and isinstance(l_ast, ast.Constant):
             continue
 
-        if field == 'str' and hasattr(ast, 'Interpolation') and isinstance(l_ast, ast.Interpolation):
+        if field == "str" and hasattr(ast, "Interpolation") and isinstance(l_ast, ast.Interpolation):
             continue
 
         if isinstance(getattr(l_ast, field, None), list):
-
             l_list = getattr(l_ast, field, None)
             r_list = getattr(r_ast, field, None)
 
@@ -76,7 +74,7 @@ def compare_ast(l_ast, r_ast):
                 raise CompareError(
                     l_list,
                     r_list,
-                    'List does not have the same number of elements! len(%s.%s)=%r, len(%s.%s)=%r'
+                    "List does not have the same number of elements! len(%s.%s)=%r, len(%s.%s)=%r"
                     % (type(l_ast), field, len(l_list), type(r_ast), field, len(r_list)),
                 )
 
@@ -87,7 +85,7 @@ def compare_ast(l_ast, r_ast):
                     raise CompareError(
                         l_ast,
                         r_ast,
-                        'Fields do not match! %s.%s[%i]=%r, %s.%s[%i]=%r'
+                        "Fields do not match! %s.%s[%i]=%r, %s.%s[%i]=%r"
                         % (type(l_ast), field, i, left, type(r_ast), field, i, right),
                     )
 
@@ -101,5 +99,6 @@ def compare_ast(l_ast, r_ast):
                 raise CompareError(
                     l_ast,
                     r_ast,
-                    'Fields do not match! %s.%s=%r, %s.%s=%r' % (type(l_ast), field, left_field, type(r_ast), field, right_field),
+                    "Fields do not match! %s.%s=%r, %s.%s=%r"
+                    % (type(l_ast), field, left_field, type(r_ast), field, right_field),
                 )

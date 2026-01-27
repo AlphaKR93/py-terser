@@ -1,11 +1,9 @@
 import math
-import sys
 
-import python_minifier.ast_compat as ast
-from python_minifier.ast_annotation import get_parent
+import python_minifier.ast as ast
 
 from python_minifier.ast_compare import compare_ast
-from python_minifier.expression_printer import ExpressionPrinter
+from python_minifier.printer.expression_printer import ExpressionPrinter
 from python_minifier.transforms.suite_transformer import SuiteTransformer
 from python_minifier.util import is_constant_node
 
@@ -19,7 +17,6 @@ class FoldConstants(SuiteTransformer):
         super(FoldConstants, self).__init__()
 
     def visit_BinOp(self, node):
-
         node.left = self.visit(node.left)
         node.right = self.visit(node.right)
 
@@ -56,7 +53,7 @@ class FoldConstants(SuiteTransformer):
             new_node = ast.NameConstant(value=original_value)
         elif isinstance(original_value, (int, float, complex)):
             try:
-                if repr(original_value).startswith('-') and not sys.version_info < (3, 0):
+                if repr(original_value).startswith("-"):
                     # Represent negative numbers as a USub UnaryOp, so that the ast roundtrip is correct
                     new_node = ast.UnaryOp(op=ast.USub(), operand=ast.Num(n=-original_value))
                 else:
@@ -82,7 +79,7 @@ class FoldConstants(SuiteTransformer):
 
         # Check the folded expression parses back to the same AST
         try:
-            folded_ast = ast.parse(folded_expression, 'folded expression', mode='eval')
+            folded_ast = ast.parse(folded_expression, "folded expression", mode="eval")
             compare_ast(new_node, folded_ast.body)
         except Exception:
             # This can happen if the printed value doesn't parse back to the same AST
@@ -94,11 +91,11 @@ class FoldConstants(SuiteTransformer):
             return node
 
         # New representation is shorter and has the same value, so use it
-        return self.add_child(new_node, get_parent(node), node.namespace)
+        return self.add_child(new_node, ast.get_parent(node), node.namespace)
 
 
 def equal_value_and_type(a, b):
-    if type(a) != type(b):
+    if type(a) is not type(b):
         return False
 
     if isinstance(a, float) and math.isnan(a) and not math.isnan(b):

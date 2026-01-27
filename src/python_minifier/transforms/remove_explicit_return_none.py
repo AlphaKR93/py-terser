@@ -1,6 +1,4 @@
-import sys
-
-import python_minifier.ast_compat as ast
+import python_minifier.ast as ast
 
 from python_minifier.transforms.suite_transformer import SuiteTransformer
 from python_minifier.util import is_constant_node
@@ -15,10 +13,7 @@ class RemoveExplicitReturnNone(SuiteTransformer):
 
         # Transform `return None` -> `return`
 
-        if sys.version_info < (3, 4) and isinstance(node.value, ast.Name) and node.value.id == 'None':
-            node.value = None
-
-        elif sys.version_info >= (3, 4) and is_constant_node(node.value, ast.NameConstant) and node.value.value is None:
+        if is_constant_node(node.value, ast.NameConstant) and node.value.value is None:
             node.value = None
 
         return node

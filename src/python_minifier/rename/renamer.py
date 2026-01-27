@@ -1,8 +1,8 @@
-import python_minifier.ast_compat as ast
+import python_minifier.ast as ast
 
-from python_minifier.rename.binding import NameBinding
-from python_minifier.rename.name_generator import name_filter
-from python_minifier.rename.util import is_namespace
+from .binding import NameBinding
+from .name_generator import name_filter
+from .util import is_namespace
 
 
 def all_bindings(node):
@@ -58,9 +58,17 @@ def reservation_scope(namespace, binding):
     namespaces = {namespace}
 
     for node in binding.references:
-        while node is not namespace:
-            namespaces.add(node.namespace)
-            node = node.namespace
+        curr = node.namespace
+        while curr is not namespace:
+            namespaces.add(curr)
+
+            # [수정됨] 모듈 경계에 도달하거나, 더 이상 부모가 없으면 중단 (무한 루프 방지)
+            if isinstance(curr, ast.Module):
+                break
+            if not hasattr(curr, "namespace") or curr.namespace is curr:
+                break
+
+            curr = curr.namespace
 
     return namespaces
 
@@ -75,6 +83,9 @@ def add_assigned(node):
     """
 
     if is_namespace(node):
+        # 이미 초기화되어 있다면 덮어쓰지 않도록 할 수도 있지만,
+        # 기본 로직은 호출 시 초기화하는 것입니다.
+        # NameAssigner 호출 시 제어합니다.
         node.assigned_names = set()
 
     for child in ast.iter_child_nodes(node):
@@ -92,7 +103,10 @@ def reserve_name(name, reservation_scope):
     """
 
     for namespace in reservation_scope:
-        namespace.assigned_names.add(name)
+        # [Fix] Only reserve in active namespaces (nodes that are still in the AST)
+        # If a node was removed by a previous transform (like RemoveDebug), it won't have assigned_names.
+        if hasattr(namespace, "assigned_names"):
+            namespace.assigned_names.add(name)
 
 
 class UniqueNameAssigner(object):
@@ -145,7 +159,7 @@ class NameAssigner(object):
             self.names.append(name)
             yield name
 
-    def available_name(self, reservation_scope, prefix=''):
+    def available_name(self, reservation_scope, prefix=""):
         """
         Search for the first name that is not in reservation scope
         """
@@ -166,12 +180,21 @@ class NameAssigner(object):
         :rtype: bool
 
         """
-
-        return all(name not in namespace.assigned_names for namespace in reservation_scope)
+        # [Fix] Check availability only in active namespaces
+        # Nodes removed by transforms (e.g. RemoveDebug) will not have assigned_names attribute.
+        for namespace in reservation_scope:
+            assigned = getattr(namespace, "assigned_names", None)
+            if assigned is not None and name in assigned:
+                return False
+        return True
 
     def __call__(self, module, prefix_globals, reserved_globals=None):
         assert isinstance(module, ast.Module)
-        add_assigned(module)
+
+        # [수정됨] assigned_names가 없는 경우에만 초기화합니다.
+        # 프로젝트 전체 Minify 시, 미리 초기화된 상태를 유지해야 교차 참조 시 이름 충돌을 방지할 수 있습니다.
+        if not getattr(module, "assigned_names", None):
+            add_assigned(module)
 
         for namespace, binding in all_bindings(module):
             if binding.reserved is not None:
@@ -179,6 +202,10 @@ class NameAssigner(object):
                 reserve_name(binding.reserved, scope)
 
         if reserved_globals is not None:
+            # 모듈이 이미 초기화되어 있어도 reserved_globals는 추가해야 합니다.
+            if not hasattr(module, "assigned_names"):
+                # 안전장치 (위에서 처리되지만)
+                module.assigned_names = set()
             for name in reserved_globals:
                 module.assigned_names.add(name)
 
@@ -206,9 +233,8 @@ class NameAssigner(object):
             scope = reservation_scope(namespace, binding)
 
             if binding.allow_rename:
-
                 if isinstance(namespace, ast.Module) and prefix_globals:
-                    name = self.available_name(scope, prefix='_')
+                    name = self.available_name(scope, prefix="_")
                 else:
                     name = self.available_name(scope)
 
@@ -221,8 +247,27 @@ class NameAssigner(object):
             if binding.name is not None:
                 reserve_name(binding.name, scope)
 
+        # [New] Generate export aliases for preserved globals that were renamed
+        exports = []
+        # We only handle module-level bindings for this feature
+        for binding in module.bindings:
+            if isinstance(binding, NameBinding) and getattr(binding, "export_as", None):
+                if binding.name != binding.export_as:
+                    # The binding was renamed, but needs to be exported with its original name
+                    exports.append((binding.export_as, binding.name))
+
+        # Sort by original name to ensure deterministic output
+        exports.sort(key=lambda x: x[0])
+
+        for original, new_name in exports:
+            module.body.append(
+                ast.Assign(
+                    targets=[ast.Name(id=original, ctx=ast.Store())], value=ast.Name(id=new_name, ctx=ast.Load())
+                )
+            )
+
         return module
 
 
-def rename(module, prefix_globals=False, preserved_globals=None):
-    NameAssigner()(module, prefix_globals, preserved_globals)
+def rename(module, prefix_globals=False, preserved_globals=None, allow_unicode=False):
+    NameAssigner(name_generator=name_filter(allow_unicode=allow_unicode))(module, prefix_globals, preserved_globals)

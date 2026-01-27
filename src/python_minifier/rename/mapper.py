@@ -2,8 +2,7 @@
 For each node in an AST set the namespace to use for name binding and resolution
 """
 
-import python_minifier.ast_compat as ast
-from python_minifier.ast_annotation import get_parent
+import python_minifier.ast as ast
 
 from python_minifier.rename.util import is_namespace
 
@@ -11,12 +10,12 @@ from python_minifier.rename.util import is_namespace
 def add_parent_to_arguments(arguments, func):
     arguments.namespace = func
 
-    for arg in getattr(arguments, 'posonlyargs', []) + arguments.args:
+    for arg in getattr(arguments, "posonlyargs", []) + arguments.args:
         add_parent(arg, func)
-        if hasattr(arg, 'annotation') and arg.annotation is not None:
+        if hasattr(arg, "annotation") and arg.annotation is not None:
             add_parent(arg.annotation, func.namespace)
 
-    if hasattr(arguments, 'kwonlyargs'):
+    if hasattr(arguments, "kwonlyargs"):
         for arg in arguments.kwonlyargs:
             add_parent(arg, func)
             if arg.annotation is not None:
@@ -30,7 +29,7 @@ def add_parent_to_arguments(arguments, func):
         add_parent(node, func.namespace)
 
     if arguments.vararg:
-        if hasattr(arguments, 'varargannotation') and arguments.varargannotation is not None:
+        if hasattr(arguments, "varargannotation") and arguments.varargannotation is not None:
             add_parent(arguments.varargannotation, func.namespace)
         elif isinstance(arguments.vararg, str):
             pass
@@ -38,7 +37,7 @@ def add_parent_to_arguments(arguments, func):
             add_parent(arguments.vararg, func)
 
     if arguments.kwarg:
-        if hasattr(arguments, 'kwargannotation') and arguments.kwargannotation is not None:
+        if hasattr(arguments, "kwargannotation") and arguments.kwargannotation is not None:
             add_parent(arguments.kwargannotation, func.namespace)
         elif isinstance(arguments.kwarg, str):
             pass
@@ -60,11 +59,11 @@ def add_parent_to_functiondef(functiondef):
     for node in functiondef.decorator_list:
         add_parent(node, namespace=functiondef.namespace)
 
-    if hasattr(functiondef, 'type_params') and functiondef.type_params is not None:
+    if hasattr(functiondef, "type_params") and functiondef.type_params is not None:
         for node in functiondef.type_params:
             add_parent(node, namespace=functiondef.namespace)
 
-    if hasattr(functiondef, 'returns') and functiondef.returns is not None:
+    if hasattr(functiondef, "returns") and functiondef.returns is not None:
         add_parent(functiondef.returns, namespace=functiondef.namespace)
 
 
@@ -76,14 +75,14 @@ def add_parent_to_classdef(classdef):
     for node in classdef.bases:
         add_parent(node, namespace=classdef.namespace)
 
-    if hasattr(classdef, 'keywords'):
+    if hasattr(classdef, "keywords"):
         for node in classdef.keywords:
             add_parent(node, namespace=classdef.namespace)
 
-    if hasattr(classdef, 'starargs') and classdef.starargs is not None:
+    if hasattr(classdef, "starargs") and classdef.starargs is not None:
         add_parent(classdef.starargs, namespace=classdef.namespace)
 
-    if hasattr(classdef, 'kwargs') and classdef.kwargs is not None:
+    if hasattr(classdef, "kwargs") and classdef.kwargs is not None:
         add_parent(classdef.kwargs, namespace=classdef.namespace)
 
     for node in classdef.body:
@@ -92,7 +91,7 @@ def add_parent_to_classdef(classdef):
     for node in classdef.decorator_list:
         add_parent(node, namespace=classdef.namespace)
 
-    if hasattr(classdef, 'type_params') and classdef.type_params is not None:
+    if hasattr(classdef, "type_params") and classdef.type_params is not None:
         for node in classdef.type_params:
             add_parent(node, namespace=classdef.namespace)
 
@@ -100,9 +99,9 @@ def add_parent_to_classdef(classdef):
 def add_parent_to_comprehension(node, namespace):
     assert isinstance(node, (ast.GeneratorExp, ast.SetComp, ast.DictComp, ast.ListComp))
 
-    if hasattr(node, 'elt'):
+    if hasattr(node, "elt"):
         add_parent(node.elt, namespace=node)
-    elif hasattr(node, 'key'):
+    elif hasattr(node, "key"):
         add_parent(node.key, namespace=node)
         add_parent(node.value, namespace=node)
 
@@ -118,6 +117,7 @@ def add_parent_to_comprehension(node, namespace):
 
         iter_namespace = node
 
+
 def namedexpr_namespace(node):
     """
     Get the namespace for a NamedExpr target
@@ -128,11 +128,13 @@ def namedexpr_namespace(node):
 
     return namedexpr_namespace(node.namespace)
 
+
 def add_parent_to_namedexpr(node):
     assert isinstance(node, ast.NamedExpr)
 
     add_parent(node.target, namespace=namedexpr_namespace(node.namespace))
     add_parent(node.value, namespace=node.namespace)
+
 
 def add_parent(node, namespace=None):
     """
@@ -175,7 +177,7 @@ def add_parent(node, namespace=None):
     if isinstance(node, ast.Name) and isinstance(namespace, ast.ClassDef):
         if isinstance(node.ctx, ast.Load):
             namespace.nonlocal_names.add(node.id)
-        elif isinstance(node.ctx, ast.Store) and isinstance(get_parent(node), ast.AugAssign):
+        elif isinstance(node.ctx, ast.Store) and isinstance(ast.get_parent(node), ast.AugAssign):
             namespace.nonlocal_names.add(node.id)
 
     if isinstance(node, ast.NamedExpr):

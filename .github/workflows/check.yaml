@@ -1,0 +1,44 @@
+name: Check code status
+on:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244
+        with:
+          activate-environment: true
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --all-groups --all-extras --no-progress --color never
+        
+      - name: Install linter manually
+        if: ${{ failure() }}
+        run: uv install ruff ty basedpyright --no-progress --color never
+
+      - name: Lint codes with ruff
+        if: always()
+        run: ruff check --output-format github
+
+      - name: Check code styles with ruff
+        if: always()
+        run: ruff format --preview --check --output-format github
+
+      - name: Check code health with ty
+        continue-on-error: true # TEMP: Currently there are so many type errors
+        if: always()
+        run: ty check --color never --no-progress --output-format github
+
+      - name: Run basedpyright
+        continue-on-error: true # TEMP: Currently there are so many type errors
+        if: always()
+        run: basedpyright --stats

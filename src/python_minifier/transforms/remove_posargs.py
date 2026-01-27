@@ -1,8 +1,8 @@
-import python_minifier.ast_compat as ast
+import python_minifier.ast as ast
 
 
 def remove_posargs(node):
-    if isinstance(node, ast.arguments) and hasattr(node, 'posonlyargs'):
+    if isinstance(node, ast.arguments) and hasattr(node, "posonlyargs"):
         node.args = node.posonlyargs + node.args
         node.posonlyargs = []
 

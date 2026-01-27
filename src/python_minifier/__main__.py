@@ -1,4 +1,5 @@
 from __future__ import print_function
+from importlib import metadata
 
 import argparse
 import os
@@ -10,84 +11,68 @@ from python_minifier.transforms.remove_annotations_options import RemoveAnnotati
 
 class MinificationNotBeneficialError(Exception):
     """Raised when minification results in larger output than the original."""
+
     pass
 
-def stdout_write_bytes(data):
-    """Write bytes to stdout with proper Python 2.7/3.x compatibility."""
-    if sys.version_info >= (3, 0):
-        sys.stdout.buffer.write(data)
-    else:
-        sys.stdout.write(data)
 
-
-if sys.version_info >= (3, 8):
-    from importlib import metadata
-
-    try:
-        version = metadata.version('python-minifier')
-    except metadata.PackageNotFoundError:
-        version = '0.0.0'
-else:
-    from pkg_resources import DistributionNotFound, get_distribution
-
-    try:
-        version = get_distribution('python_minifier').version
-    except DistributionNotFound:
-        version = '0.0.0'
+try:
+    version = metadata.version("python-minifier")
+except metadata.PackageNotFoundError:
+    version = "0.0.0"
 
 
 def main():
     """
-examples:
-  # Minifying stdin to stdout
-  pyminify -
+    examples:
+      # Minifying stdin to stdout
+      pyminify -
 
-  # Minifying a file to stdout
-  pyminify example.py
+      # Minifying a file to stdout
+      pyminify example.py
 
-  # Minifying a file and writing to a different file
-  pyminify example.py --output example.min.py
+      # Minifying a file and writing to a different file
+      pyminify example.py --output example.min.py
 
-  # Minifying a file in place
-  pyminify example.py --in-place
+      # Minifying a file in place
+      pyminify example.py --in-place
 
-  # Minifying all *.py files in a directory
-  pyminify src/ --in-place
+      # Minifying all *.py files in a directory
+      pyminify src/ --in-place
 
-  # Minifying multiple paths in place
-  pyminify file1.py file2.py src/ --in-place
-"""
+      # Minifying multiple paths in place
+      pyminify file1.py file2.py src/ --in-place
+    """
 
     args = parse_args()
 
-    if len(args.path) == 1 and args.path[0] == '-':
+    if len(args.path) == 1 and args.path[0] == "-":
         # minify stdin
-        source = sys.stdin.buffer.read() if sys.version_info >= (3, 0) else sys.stdin.read()
+        source = sys.stdin.buffer.read()
         try:
-            minified = do_minify(source, 'stdin', args)
+            minified = do_minify(source, "stdin", args)
         except MinificationNotBeneficialError:
             # Use original source when minification isn't beneficial
             if args.output:
-                with open(args.output, 'wb') as f:
+                with open(args.output, "wb") as f:
                     f.write(source)
             else:
                 # Write original source to stdout
-                stdout_write_bytes(source)
+                sys.stdout.buffer.write(source)
             return
 
         if args.output:
-            with open(args.output, 'wb') as f:
+            with open(args.output, "wb") as f:
                 f.write(minified)
         else:
-            stdout_write_bytes(minified)
+            sys.stdout.buffer.write(minified)
 
     else:
         # minify source paths
         for path in source_modules(args):
             if args.output or args.in_place:
-                sys.stdout.write(path + '\n')
+                sys.stdout.write(path + "\n")
 
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 source = f.read()
 
             try:
@@ -99,210 +84,216 @@ examples:
                     pass
                 elif args.output:
                     # Write original source to output
-                    with open(args.output, 'wb') as f:
+                    with open(args.output, "wb") as f:
                         f.write(source)
                 else:
                     # Write original source to stdout
-                    stdout_write_bytes(source)
+                    sys.stdout.buffer.write(source)
                 continue
 
             if args.in_place:
-                with open(path, 'wb') as f:
+                with open(path, "wb") as f:
                     f.write(minified)
             elif args.output:
-                with open(args.output, 'wb') as f:
+                with open(args.output, "wb") as f:
                     f.write(minified)
             else:
-                stdout_write_bytes(minified)
+                sys.stdout.buffer.write(minified)
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(prog='pyminify', description='Minify Python source code', formatter_class=argparse.RawDescriptionHelpFormatter, epilog=main.__doc__)
+    parser = argparse.ArgumentParser(
+        prog="pyminify",
+        description="Minify Python source code",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=main.__doc__,
+    )
 
     parser.add_argument(
-        'path',
-        nargs='+',
+        "path",
+        nargs="+",
         type=str,
         help='The source file or directory to minify. Use "-" to read from stdin. Directories are recursively searched for ".py" files to minify. May be used multiple times',
     )
 
     output_options = parser.add_mutually_exclusive_group()
     output_options.add_argument(
-        '--output', '-o',
-        action='store',
-        help='Path to write minified output. Can only be used when the source is a single module. Outputs to stdout by default',
-        dest='output'
+        "--output",
+        "-o",
+        action="store",
+        help="Path to write minified output. Can only be used when the source is a single module. Outputs to stdout by default",
+        dest="output",
     )
     output_options.add_argument(
-        '--in-place', '-i',
-        action='store_true',
-        help='Overwrite existing files. Required when there is more than one source module',
-        dest='in_place'
+        "--in-place",
+        "-i",
+        action="store_true",
+        help="Overwrite existing files. Required when there is more than one source module",
+        dest="in_place",
     )
 
     # Minification arguments
-    minification_options = parser.add_argument_group('minification options', 'Options that affect how the source is minified')
-    minification_options.add_argument(
-        '--no-combine-imports',
-        action='store_false',
-        help='Disable combining adjacent import statements',
-        dest='combine_imports',
+    minification_options = parser.add_argument_group(
+        "minification options", "Options that affect how the source is minified"
     )
     minification_options.add_argument(
-        '--no-remove-pass',
-        action='store_false',
+        "--no-combine-imports",
+        action="store_false",
+        help="Disable combining adjacent import statements",
+        dest="combine_imports",
+    )
+    minification_options.add_argument(
+        "--no-remove-pass",
+        action="store_false",
         default=True,
-        help='Disable removing Pass statements',
-        dest='remove_pass',
+        help="Disable removing Pass statements",
+        dest="remove_pass",
     )
     minification_options.add_argument(
-        '--remove-literal-statements',
-        action='store_true',
-        help='Enable removing statements that are just a literal (including docstrings)',
-        dest='remove_literal_statements',
+        "--remove-literal-statements",
+        action="store_true",
+        help="Enable removing statements that are just a literal (including docstrings)",
+        dest="remove_literal_statements",
     )
     minification_options.add_argument(
-        '--no-hoist-literals',
-        action='store_false',
-        help='Disable replacing string and bytes literals with variables',
-        dest='hoist_literals',
+        "--no-hoist-literals",
+        action="store_false",
+        help="Disable replacing string and bytes literals with variables",
+        dest="hoist_literals",
     )
     minification_options.add_argument(
-        '--no-rename-locals',
-        action='store_false',
-        help='Disable shortening of local names',
-        dest='rename_locals'
+        "--no-rename-locals", action="store_false", help="Disable shortening of local names", dest="rename_locals"
     )
     minification_options.add_argument(
-        '--preserve-locals',
+        "--preserve-locals",
         type=str,
-        action='append',
-        help='Comma separated list of local names that will not be shortened',
-        dest='preserve_locals',
-        metavar='LOCAL_NAMES'
+        action="append",
+        help="Comma separated list of local names that will not be shortened",
+        dest="preserve_locals",
+        metavar="LOCAL_NAMES",
     )
     minification_options.add_argument(
-        '--rename-globals',
-        action='store_true',
-        help='Enable shortening of global names',
-        dest='rename_globals'
+        "--rename-globals", action="store_true", help="Enable shortening of global names", dest="rename_globals"
     )
     minification_options.add_argument(
-        '--preserve-globals',
+        "--preserve-globals",
         type=str,
-        action='append',
-        help='Comma separated list of global names that will not be shortened',
-        dest='preserve_globals',
-        metavar='GLOBAL_NAMES'
+        action="append",
+        help="Comma separated list of global names that will not be shortened",
+        dest="preserve_globals",
+        metavar="GLOBAL_NAMES",
     )
     minification_options.add_argument(
-        '--no-remove-object-base',
-        action='store_false',
-        help='Disable removing object from base class list',
-        dest='remove_object_base',
+        "--no-remove-object-base",
+        action="store_false",
+        help="Disable removing object from base class list",
+        dest="remove_object_base",
     )
     minification_options.add_argument(
-        '--no-convert-posargs-to-args',
-        action='store_false',
-        help='Disable converting positional only arguments to normal arguments',
-        dest='convert_posargs_to_args',
+        "--no-convert-posargs-to-args",
+        action="store_false",
+        help="Disable converting positional only arguments to normal arguments",
+        dest="convert_posargs_to_args",
     )
     minification_options.add_argument(
-        '--no-preserve-shebang',
-        action='store_false',
-        help='Disable preserving any shebang line from the source',
-        dest='preserve_shebang',
+        "--no-preserve-shebang",
+        action="store_false",
+        help="Disable preserving any shebang line from the source",
+        dest="preserve_shebang",
     )
     minification_options.add_argument(
-        '--remove-asserts',
-        action='store_true',
-        help='Enable removing assert statements',
-        dest='remove_asserts',
+        "--remove-asserts",
+        action="store_true",
+        help="Enable removing assert statements",
+        dest="remove_asserts",
     )
     minification_options.add_argument(
-        '--remove-debug',
-        action='store_true',
-        help='Enable removing conditional statements that test __debug__ is True',
-        dest='remove_debug',
+        "--remove-debug",
+        action="store_true",
+        help="Enable removing conditional statements that test __debug__ is True",
+        dest="remove_debug",
     )
     minification_options.add_argument(
-        '--no-remove-explicit-return-none',
-        action='store_false',
-        help='Disable replacing explicit return None with a bare return',
-        dest='remove_explicit_return_none',
+        "--no-remove-explicit-return-none",
+        action="store_false",
+        help="Disable replacing explicit return None with a bare return",
+        dest="remove_explicit_return_none",
     )
     minification_options.add_argument(
-        '--no-remove-builtin-exception-brackets',
-        action='store_false',
-        help='Disable removing brackets when raising builtin exceptions with no arguments',
-        dest='remove_exception_brackets',
+        "--no-remove-builtin-exception-brackets",
+        action="store_false",
+        help="Disable removing brackets when raising builtin exceptions with no arguments",
+        dest="remove_exception_brackets",
     )
     minification_options.add_argument(
-        '--no-constant-folding',
-        action='store_false',
-        help='Disable evaluating literal expressions',
-        dest='constant_folding',
+        "--no-constant-folding",
+        action="store_false",
+        help="Disable evaluating literal expressions",
+        dest="constant_folding",
     )
 
-    annotation_options = parser.add_argument_group('remove annotations options', 'Options that affect how annotations are removed')
-    annotation_options.add_argument(
-        '--no-remove-annotations',
-        action='store_false',
-        help='Disable removing all annotations',
-        dest='remove_annotations',
+    annotation_options = parser.add_argument_group(
+        "remove annotations options", "Options that affect how annotations are removed"
     )
     annotation_options.add_argument(
-        '--no-remove-variable-annotations',
-        action='store_false',
-        help='Disable removing variable annotations',
-        dest='remove_variable_annotations',
+        "--no-remove-annotations",
+        action="store_false",
+        help="Disable removing all annotations",
+        dest="remove_annotations",
     )
     annotation_options.add_argument(
-        '--no-remove-return-annotations',
-        action='store_false',
-        help='Disable removing function return annotations',
-        dest='remove_return_annotations',
+        "--no-remove-variable-annotations",
+        action="store_false",
+        help="Disable removing variable annotations",
+        dest="remove_variable_annotations",
     )
     annotation_options.add_argument(
-        '--no-remove-argument-annotations',
-        action='store_false',
-        help='Disable removing function argument annotations',
-        dest='remove_argument_annotations',
+        "--no-remove-return-annotations",
+        action="store_false",
+        help="Disable removing function return annotations",
+        dest="remove_return_annotations",
     )
     annotation_options.add_argument(
-        '--remove-class-attribute-annotations',
-        action='store_true',
-        help='Enable removing class attribute annotations',
-        dest='remove_class_attribute_annotations',
+        "--no-remove-argument-annotations",
+        action="store_false",
+        help="Disable removing function argument annotations",
+        dest="remove_argument_annotations",
+    )
+    annotation_options.add_argument(
+        "--remove-class-attribute-annotations",
+        action="store_true",
+        help="Enable removing class attribute annotations",
+        dest="remove_class_attribute_annotations",
     )
 
-    parser.add_argument('--version', '-v', action='version', version=version)
+    parser.add_argument("--version", "-v", action="version", version=version)
 
     args = parser.parse_args()
 
     # Handle some invalid argument combinations
-    if '-' in args.path and len(args.path) != 1:
-        sys.stderr.write('error: multiple path arguments, reading from stdin not allowed\n')
+    if "-" in args.path and len(args.path) != 1:
+        sys.stderr.write("error: multiple path arguments, reading from stdin not allowed\n")
         sys.exit(1)
-    if '-' in args.path and args.in_place:
-        sys.stderr.write('error: reading from stdin, --in-place is not valid\n')
+    if "-" in args.path and args.in_place:
+        sys.stderr.write("error: reading from stdin, --in-place is not valid\n")
         sys.exit(1)
     if len(args.path) > 1 and not args.in_place:
-        sys.stderr.write('error: multiple path arguments, --in-place required\n')
+        sys.stderr.write("error: multiple path arguments, --in-place required\n")
         sys.exit(1)
     if len(args.path) == 1 and os.path.isdir(args.path[0]) and not args.in_place:
-        sys.stderr.write('error: path ' + args.path[0] + ' is a directory, --in-place required\n')
+        sys.stderr.write("error: path " + args.path[0] + " is a directory, --in-place required\n")
         sys.exit(1)
 
     if args.remove_class_attribute_annotations and not args.remove_annotations:
-        sys.stderr.write('error: --remove-class-attribute-annotations would do nothing when used with --no-remove-annotations\n')
+        sys.stderr.write(
+            "error: --remove-class-attribute-annotations would do nothing when used with --no-remove-annotations\n"
+        )
         sys.exit(1)
 
     return args
 
 
 def source_modules(args):
-
     def error(os_error):
         raise os_error
 
@@ -310,7 +301,7 @@ def source_modules(args):
         if os.path.isdir(path_arg):
             for root, _dirs, files in os.walk(path_arg, onerror=error, followlinks=True):
                 for file in files:
-                    if file.endswith(('.py', '.pyw')):
+                    if file.endswith((".py", ".pyw")):
                         yield os.path.join(root, file)
         else:
             yield path_arg
@@ -330,13 +321,13 @@ def do_minify(source, filename, minification_args):
     preserve_globals = []
     if minification_args.preserve_globals:
         for arg in minification_args.preserve_globals:
-            names = [name.strip() for name in arg.split(',') if name]
+            names = [name.strip() for name in arg.split(",") if name]
             preserve_globals.extend(names)
 
     preserve_locals = []
     if minification_args.preserve_locals:
         for arg in minification_args.preserve_locals:
-            names = [name.strip() for name in arg.split(',') if name]
+            names = [name.strip() for name in arg.split(",") if name]
             preserve_locals.extend(names)
 
     if minification_args.remove_annotations is False:
@@ -373,14 +364,14 @@ def do_minify(source, filename, minification_args):
         remove_debug=minification_args.remove_debug,
         remove_explicit_return_none=minification_args.remove_explicit_return_none,
         remove_builtin_exception_brackets=minification_args.remove_exception_brackets,
-        constant_folding=minification_args.constant_folding
+        constant_folding=minification_args.constant_folding,
     )
 
     # Encode minified result to bytes for comparison and output
-    minified_bytes = minified_result.encode('utf-8')
+    minified_bytes = minified_result.encode("utf-8")
 
     # Check if environment variable forces minified output
-    if os.environ.get('PYMINIFY_FORCE_BEST_EFFORT'):
+    if os.environ.get("PYMINIFY_FORCE_BEST_EFFORT"):
         return minified_bytes
 
     # Compare byte lengths for accurate size comparison
@@ -390,5 +381,5 @@ def do_minify(source, filename, minification_args):
     return minified_bytes
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

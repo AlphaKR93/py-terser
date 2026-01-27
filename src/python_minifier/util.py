@@ -1,7 +1,7 @@
-import python_minifier.ast_compat as ast
+import python_minifier.ast as ast
 
 
-def is_constant_node(node, types):
+def is_constant_node(node: ast.AST, *types: type[ast.AST]) -> bool:
     """
     Is a node one of the specified node types
 
@@ -15,9 +15,6 @@ def is_constant_node(node, types):
     :rtype: bool
 
     """
-
-    if not isinstance(types, tuple):
-        types = (types,)
 
     for node_type in types:
         assert not isinstance(node_type, str)
@@ -37,6 +34,6 @@ def is_constant_node(node, types):
         elif node.value == Ellipsis:
             return ast.Ellipsis in types
         else:
-            raise RuntimeError('Unknown Constant value %r' % type(node.value))
+            raise RuntimeError("Unknown Constant value %r" % type(node.value))
 
     return False

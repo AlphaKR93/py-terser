@@ -1,31 +1,30 @@
-import sys
-
-import python_minifier.ast_compat as ast
+import python_minifier.ast as ast
 
 from python_minifier.util import is_constant_node
 
 
-def create_is_namespace():
+def is_namespace(node: ast.AST):
+    return isinstance(
+        node,
+        (
+            ast.FunctionDef,
+            ast.Lambda,
+            ast.ClassDef,
+            ast.Module,
+            ast.GeneratorExp,
+            ast.SetComp,  # Python 2.7+
+            ast.DictComp,  # Python 2.7+
+            ast.ListComp,  # Python 3.0+
+            ast.AsyncFunctionDef,  # Python 3.5+
+        ),
+    )
 
-    namespace_nodes = (ast.FunctionDef, ast.Lambda, ast.ClassDef, ast.Module, ast.GeneratorExp)
 
-    if sys.version_info >= (2, 7):
-        namespace_nodes += (ast.SetComp, ast.DictComp)
-
-    if sys.version_info >= (3, 0):
-        namespace_nodes += (ast.ListComp,)
-
-    if sys.version_info >= (3, 5):
-        namespace_nodes += (ast.AsyncFunctionDef,)
-
-    return lambda node: isinstance(node, namespace_nodes)
-
-
-is_namespace = create_is_namespace()
+def utf8_byte_len(s: str) -> int:
+    return len(s.encode("utf-8"))
 
 
 def iter_child_namespaces(node):
-
     for child in ast.iter_child_nodes(node):
         if is_namespace(child):
             yield child
@@ -87,7 +86,7 @@ def arg_rename_in_place(node):
         return True
 
     if isinstance(func.namespace, ast.ClassDef) and not isinstance(func, ast.Lambda):
-        all_args = (func.args.posonlyargs if hasattr(func.args, 'posonlyargs') else []) + func.args.args
+        all_args = (func.args.posonlyargs if hasattr(func.args, "posonlyargs") else []) + func.args.args
         if len(all_args) > 0 and node is all_args[0]:
             if len(func.decorator_list) == 0:
                 # rename 'self'
@@ -95,7 +94,7 @@ def arg_rename_in_place(node):
             elif (
                 len(func.decorator_list) == 1
                 and isinstance(func.decorator_list[0], ast.Name)
-                and func.decorator_list[0].id == 'classmethod'
+                and func.decorator_list[0].id == "classmethod"
             ):
                 # rename 'cls'
                 return True
@@ -104,7 +103,7 @@ def arg_rename_in_place(node):
         # starargs
         return True
 
-    if hasattr(func.args, 'posonlyargs') and node in func.args.posonlyargs:
+    if hasattr(func.args, "posonlyargs") and node in func.args.posonlyargs:
         return True
 
     return False
@@ -124,9 +123,8 @@ def insert(suite, new_node):
 
     inserted = False
     for node in suite:
-
         if not inserted:
-            if (isinstance(node, ast.ImportFrom) and node.module == '__future__') or (
+            if (isinstance(node, ast.ImportFrom) and node.module == "__future__") or (
                 isinstance(node, ast.Expr) and is_constant_node(node.value, ast.Str)
             ):
                 pass
@@ -141,7 +139,6 @@ def insert(suite, new_node):
 
 
 def allow_rename_locals(node, rename_locals, preserve_locals=None):
-
     if preserve_locals is None:
         preserve_locals = []
 
@@ -157,17 +154,16 @@ def allow_rename_locals(node, rename_locals, preserve_locals=None):
 
 
 def find__all__(module):
-
     names = []
 
     def is_assign_all_node(node):
         if isinstance(node, ast.Assign):
             for name in node.targets:
-                if isinstance(name, ast.Name) and name.id == '__all__':
+                if isinstance(name, ast.Name) and name.id == "__all__":
                     return True
 
         elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
-            if isinstance(node.target, ast.Name) and node.target.id == '__all__':
+            if isinstance(node.target, ast.Name) and node.target.id == "__all__":
                 return True
 
         return False
@@ -187,15 +183,18 @@ def find__all__(module):
 
 
 def allow_rename_globals(module, rename_globals=False, preserve_globals=None):
-
     if preserve_globals is None:
         preserve_globals = []
 
     preserve_globals.extend(find__all__(module))
 
     for binding in module.bindings:
-        if rename_globals is False or binding.name in preserve_globals:
+        if rename_globals is False:
             binding.disallow_rename()
+        elif binding.name in preserve_globals:
+            # Instead of disallowing rename completely, we mark it to be exported as an alias
+            # if it gets renamed.
+            binding.export_as = binding.name
 
 
 try:
@@ -203,3 +202,18 @@ try:
 except ImportError:
     # noinspection PyCompatibility
     import __builtin__ as builtins  # type: ignore
+
+
+__all__ = (
+    "is_namespace",
+    "utf8_byte_len",
+    "iter_child_namespaces",
+    "get_global_namespace",
+    "get_nonlocal_namespace",
+    "arg_rename_in_place",
+    "insert",
+    "allow_rename_locals",
+    "allow_rename_globals",
+    "find__all__",
+    "builtins",
+)

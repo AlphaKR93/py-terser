@@ -1,0 +1,15 @@
+[project]
+name = "py-terser"
+version = "0.1.0"
+description = "Transform Python modules into its most compact representation"
+readme = "README.md"
+authors = [{ name = "Alpha", email = "dev@alpha93.kr" }]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+py-terser = "terser:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

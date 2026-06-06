@@ -5,7 +5,7 @@ import sys
 
 import pytest
 
-from python_minifier import minify
+from terser import minify
 
 try:
     import yaml

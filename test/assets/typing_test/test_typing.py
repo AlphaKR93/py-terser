@@ -4,7 +4,7 @@ This should pass typechecking
 
 import ast
 
-from python_minifier import RemoveAnnotationsOptions, awslambda, minify, unparse
+from terser import RemoveAnnotationsOptions, awslambda, minify, unparse
 
 
 def test_typing() -> None:

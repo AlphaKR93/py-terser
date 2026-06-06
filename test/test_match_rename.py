@@ -3,10 +3,10 @@ import sys
 
 import pytest
 
-from python_minifier import unparse
-from python_minifier.ast_annotation import add_parent
-from python_minifier.ast_compare import CompareError, compare_ast
-from python_minifier.rename import (
+from terser import unparse
+from terser.ast_annotation import add_parent
+from terser.ast_compare import CompareError, compare_ast
+from terser.rename import (
     add_namespace,
     allow_rename_globals,
     allow_rename_locals,

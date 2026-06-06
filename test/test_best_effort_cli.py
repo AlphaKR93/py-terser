@@ -27,7 +27,7 @@ if __name__ == "__main__":
         env.pop('PYMINIFY_FORCE_BEST_EFFORT', None)
 
         result = run_subprocess([
-            sys.executable, '-m', 'python_minifier', temp_file
+            sys.executable, '-m', 'terser', temp_file
         ], timeout=30, env=env)
 
         assert result.returncode == 0
@@ -52,7 +52,7 @@ def test_returns_original_when_longer():
         env.pop('PYMINIFY_FORCE_BEST_EFFORT', None)
 
         result = run_subprocess([
-            sys.executable, '-m', 'python_minifier', temp_file
+            sys.executable, '-m', 'terser', temp_file
         ], timeout=30, env=env)
 
         assert result.returncode == 0
@@ -78,7 +78,7 @@ def test_force_minified_with_env_var():
         env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
 
         result = run_subprocess([
-            sys.executable, '-m', 'python_minifier', temp_file
+            sys.executable, '-m', 'terser', temp_file
         ], timeout=30, env=env)
 
         assert result.returncode == 0
@@ -100,7 +100,7 @@ def test_stdin_behavior():
     env.pop('PYMINIFY_FORCE_BEST_EFFORT', None)
 
     result = run_subprocess([
-        sys.executable, '-m', 'python_minifier', '-'
+        sys.executable, '-m', 'terser', '-'
     ], input_data=code, timeout=30, env=env)
 
     assert result.returncode == 0
@@ -111,7 +111,7 @@ def test_stdin_behavior():
     env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
 
     result = run_subprocess([
-        sys.executable, '-m', 'python_minifier', '-'
+        sys.executable, '-m', 'terser', '-'
     ], input_data=code, timeout=30, env=env)
 
     assert result.returncode == 0
@@ -135,7 +135,7 @@ def test_output_file_behavior():
         env.pop('PYMINIFY_FORCE_BEST_EFFORT', None)
 
         result = run_subprocess([
-            sys.executable, '-m', 'python_minifier',
+            sys.executable, '-m', 'terser',
             input_filename, '--output', output_filename
         ], timeout=30, env=env)
 
@@ -164,7 +164,7 @@ def test_in_place_behavior():
         env.pop('PYMINIFY_FORCE_BEST_EFFORT', None)
 
         result = run_subprocess([
-            sys.executable, '-m', 'python_minifier',
+            sys.executable, '-m', 'terser',
             temp_file, '--in-place'
         ], timeout=30, env=env)
 
@@ -177,3 +177,105 @@ def test_in_place_behavior():
 
     finally:
         os.unlink(temp_file)
+
+
+def test_directory_output_and_reachability():
+    """Test minifying multiple directories to an output directory, and verifying reachability prunes unused files."""
+    with tempfile.TemporaryDirectory() as src_dir:
+        src_path = os.path.join(src_dir, 'src')
+        vendor_path = os.path.join(src_dir, '_vendor')
+        os.makedirs(src_path)
+        os.makedirs(vendor_path)
+        
+        app_code = "from my_vendor import used_func\nused_func()"
+        with open(os.path.join(src_path, 'app.py'), 'w') as f:
+            f.write(app_code)
+            
+        vendor_code = "def used_func():\n    pass"
+        with open(os.path.join(vendor_path, 'my_vendor.py'), 'w') as f:
+            f.write(vendor_code)
+            
+        unused_code = "def unused_func():\n    pass"
+        with open(os.path.join(vendor_path, 'unused_vendor.py'), 'w') as f:
+            f.write(unused_code)
+            
+        out_dir = os.path.join(src_dir, 'out')
+        
+        env = os.environ.copy()
+        env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
+        
+        result = run_subprocess([
+            sys.executable, '-m', 'terser',
+            src_path, vendor_path, '--output', out_dir
+        ], timeout=30, env=env)
+        
+        assert result.returncode == 0
+        out_files = os.listdir(out_dir)
+        assert len(out_files) == 2
+        for filename in out_files:
+            assert 'unused_vendor' not in filename
+
+
+def test_in_place_reachability():
+    """Test that --in-place deletes unused modules."""
+    with tempfile.TemporaryDirectory() as src_dir:
+        src_path = os.path.join(src_dir, 'src')
+        vendor_path = os.path.join(src_dir, '_vendor')
+        os.makedirs(src_path)
+        os.makedirs(vendor_path)
+        
+        app_code = "from my_vendor import used_func\nused_func()"
+        app_file = os.path.join(src_path, 'app.py')
+        with open(app_file, 'w') as f:
+            f.write(app_code)
+            
+        vendor_code = "def used_func():\n    pass"
+        vendor_file = os.path.join(vendor_path, 'my_vendor.py')
+        with open(vendor_file, 'w') as f:
+            f.write(vendor_code)
+            
+        unused_file = os.path.join(vendor_path, 'unused_vendor.py')
+        unused_code = "def unused_func():\n    pass"
+        with open(unused_file, 'w') as f:
+            f.write(unused_code)
+            
+        env = os.environ.copy()
+        env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
+        
+        result = run_subprocess([
+            sys.executable, '-m', 'terser',
+            src_path, vendor_path, '--in-place'
+        ], timeout=30, env=env)
+        
+        assert result.returncode == 0
+        src_files = os.listdir(src_path)
+        assert len(src_files) == 1
+        vendor_files = os.listdir(vendor_path)
+        assert len(vendor_files) == 1
+        assert 'unused_vendor.py' not in vendor_files
+
+
+def test_large_number_of_components():
+    """Test that cli can handle a very large number of top-level names without raising StopIteration."""
+    classes = [f"class Class{i}:\n    pass" for i in range(3000)]
+    code = "\n".join(classes)
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        f.write(code)
+        temp_file = f.name
+        
+    try:
+        env = os.environ.copy()
+        env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
+        
+        result = run_subprocess([
+            sys.executable, '-m', 'terser',
+            temp_file, '--output', temp_file + '.out'
+        ], timeout=60, env=env)
+        
+        assert result.returncode == 0
+        assert os.path.exists(temp_file + '.out')
+    finally:
+        os.unlink(temp_file)
+        if os.path.exists(temp_file + '.out'):
+            os.unlink(temp_file + '.out')

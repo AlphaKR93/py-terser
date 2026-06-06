@@ -6,7 +6,7 @@ import os
 import sys
 import time
 
-import python_minifier
+import terser
 
 from result import Result, ResultWriter
 
@@ -38,7 +38,7 @@ def minify_corpus_entry(corpus_path, corpus_entry):
 
     start_time = time.time()
     try:
-        minified = python_minifier.minify(source, filename=corpus_entry)
+        minified = terser.minify(source, filename=corpus_entry)
         end_time = time.time()
         result.time = end_time - start_time
 
@@ -58,7 +58,7 @@ def minify_corpus_entry(corpus_path, corpus_entry):
         # Source not valid for this version of Python
         result.outcome = 'SyntaxError'
 
-    except python_minifier.UnstableMinification:
+    except terser.UnstableMinification:
         # Minification does not equal original source
         end_time = time.time()
         result.time = end_time - start_time

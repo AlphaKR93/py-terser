@@ -3,8 +3,8 @@ import sys
 
 import pytest
 
-from python_minifier import minify
-from python_minifier.ast_compare import compare_ast
+from terser import minify
+from terser.ast_compare import compare_ast
 
 
 def test_listcomp_regression_2_7():

@@ -2,7 +2,7 @@ import ast
 
 import pytest
 
-from python_minifier import unparse
+from terser import unparse
 
 
 @pytest.mark.parametrize(

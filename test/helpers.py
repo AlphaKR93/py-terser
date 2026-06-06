@@ -1,10 +1,10 @@
-import python_minifier.ast_compat as ast
-from python_minifier.ast_annotation import add_parent
+import terser.ast_compat as ast
+from terser.ast_annotation import add_parent
 
-from python_minifier.rename import add_namespace, resolve_names
-from python_minifier.rename.bind_names import bind_names
-from python_minifier.rename.util import iter_child_namespaces
-from python_minifier.util import is_constant_node
+from terser.rename import add_namespace, resolve_names
+from terser.rename.bind_names import bind_names
+from terser.rename.util import iter_child_namespaces
+from terser.util import is_constant_node
 
 
 def assert_namespace_tree(source, expected_tree):

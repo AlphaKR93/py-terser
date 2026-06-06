@@ -1,4 +1,4 @@
-from python_minifier import minify
+from terser import minify
 
 
 def test_no_preserve_shebang():

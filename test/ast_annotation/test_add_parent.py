@@ -1,6 +1,6 @@
 import pytest
 import ast
-from python_minifier.ast_annotation import add_parent, get_parent, set_parent
+from terser.ast_annotation import add_parent, get_parent, set_parent
 
 
 def test_add_parent():

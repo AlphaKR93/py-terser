@@ -5,7 +5,7 @@ import warnings
 
 import pytest
 
-from python_minifier import minify, unparse
+from terser import minify, unparse
 
 warnings.filterwarnings('ignore')
 

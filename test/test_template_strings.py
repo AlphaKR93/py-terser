@@ -3,8 +3,8 @@ import sys
 
 import pytest
 
-from python_minifier import unparse
-from python_minifier.ast_compare import compare_ast
+from terser import unparse
+from terser.ast_compare import compare_ast
 
 
 @pytest.mark.skipif(sys.version_info < (3, 14), reason="Template strings require Python 3.14+")

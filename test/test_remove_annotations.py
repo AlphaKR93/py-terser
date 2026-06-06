@@ -3,18 +3,21 @@ import sys
 
 import pytest
 
-from python_minifier import RemoveAnnotationsOptions
-from python_minifier.ast_annotation import add_parent
-from python_minifier.ast_compare import compare_ast
-from python_minifier.rename import add_namespace
-from python_minifier.transforms.remove_annotations import RemoveAnnotations
+from terser import RemoveAnnotationsOptions
+from terser.ast_annotation import add_parent
+from terser.ast_compare import compare_ast
+from terser.rename import add_namespace
+from terser.transforms.remove_annotations import RemoveAnnotations
 
 
 def remove_annotations(source, **kwargs):
+    from terser.transforms.remove_type_hints import RemoveTypeHints
     module = ast.parse(source)
     add_parent(module)
     add_namespace(module)
-    RemoveAnnotations(RemoveAnnotationsOptions(**kwargs))(module)
+    options = RemoveAnnotationsOptions(**kwargs)
+    module = RemoveAnnotations(options)(module)
+    module = RemoveTypeHints(options)(module)
     return module
 
 

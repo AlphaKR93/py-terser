@@ -2,7 +2,7 @@
 This should fail type checking
 """
 
-from python_minifier import minify
+from terser import minify
 
 
 def test_typing() -> None:

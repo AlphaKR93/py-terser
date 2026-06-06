@@ -1,9 +1,9 @@
 import ast
 
-from python_minifier.ast_annotation import add_parent
-from python_minifier.ast_compare import compare_ast
-from python_minifier.rename import add_namespace, bind_names, resolve_names
-from python_minifier.transforms.remove_pass import RemovePass
+from terser.ast_annotation import add_parent
+from terser.ast_compare import compare_ast
+from terser.rename import add_namespace, bind_names, resolve_names
+from terser.transforms.remove_pass import RemovePass
 
 
 def remove_literals(source):

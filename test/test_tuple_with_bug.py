@@ -1,7 +1,7 @@
 import ast
 
-from python_minifier import unparse
-from python_minifier.ast_compare import compare_ast
+from terser import unparse
+from terser.ast_compare import compare_ast
 
 
 def test_single_element_tuple_in_with():

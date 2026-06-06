@@ -23,7 +23,7 @@ def test_cli_output_flag_with_unicode():
     try:
         # Run pyminify CLI with --output flag
         result = run_subprocess([
-            sys.executable, '-m', 'python_minifier',
+            sys.executable, '-m', 'terser',
             source_file.name, '--output', output_path
         ], timeout=30)
 
@@ -86,7 +86,7 @@ def test_cli_in_place_with_unicode():
     try:
         # Run pyminify with --in-place flag
         result = run_subprocess([
-            sys.executable, '-m', 'python_minifier',
+            sys.executable, '-m', 'terser',
             temp_file.name, '--in-place'
         ], timeout=30)
 
@@ -144,7 +144,7 @@ def test_cli_stdout_with_unicode():
     try:
         # Run without --output or --in-place (should output to stdout)
         result = run_subprocess([
-            sys.executable, '-m', 'python_minifier', temp_file.name
+            sys.executable, '-m', 'terser', temp_file.name
         ], timeout=30)
 
         assert result.returncode == 0, "Stdout output failed: {}".format(safe_decode(result.stderr))

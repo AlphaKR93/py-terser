@@ -1,4 +1,4 @@
-import python_minifier.ast_compat as ast
+import terser.ast_compat as ast
 
 from hypothesis.strategies import SearchStrategy, composite, lists, one_of, recursive, sampled_from
 

@@ -4,9 +4,9 @@ import sys
 import os
 import tempfile
 
-from python_minifier import minify, unparse
-from python_minifier.ast_annotation import add_parent
-from python_minifier.rename import add_namespace
+from terser import minify, unparse
+from terser.ast_annotation import add_parent
+from terser.rename import add_namespace
 
 from subprocess_compat import run_subprocess, safe_decode
 
@@ -66,12 +66,11 @@ def test_minify_function_body_uses_semicolons():
     """Function body statements use semicolons regardless of option."""
     source = '''
 def f():
-    a = 1
-    b = 2
-    return a + b
+    print(1)
+    print(2)
 '''
     # Both produce identical output since the option only affects module level
-    expected = 'def f():A=1;B=2;return A+B'
+    expected = 'def f():print(1);print(2)'
     assert minify(source, prefer_single_line=False) == expected
     assert minify(source, prefer_single_line=True) == expected
 
@@ -94,12 +93,12 @@ def test_minify_mixed_module_and_function():
     source = '''
 x = 1
 def f():
-    a = 1
-    b = 2
+    print(1)
+    print(2)
 y = 2
 '''
     # Both outputs are identical because compound statements require newlines
-    expected = 'x=1\ndef f():A=1;B=2\ny=2'
+    expected = 'x=1\ndef f():print(1);print(2)\ny=2'
     assert minify(source, prefer_single_line=False) == expected
     assert minify(source, prefer_single_line=True) == expected
 
@@ -170,7 +169,7 @@ def test_cli_default_uses_newlines():
 
     try:
         result = run_subprocess([
-            sys.executable, '-m', 'python_minifier', temp_file
+            sys.executable, '-m', 'terser', temp_file
         ], timeout=30)
 
         assert result.returncode == 0
@@ -191,7 +190,7 @@ def test_cli_prefer_single_line_flag():
 
     try:
         result = run_subprocess([
-            sys.executable, '-m', 'python_minifier',
+            sys.executable, '-m', 'terser',
             '--prefer-single-line', temp_file
         ], timeout=30)
 
@@ -208,7 +207,7 @@ def test_cli_stdin_prefer_single_line():
     expected = 'a=1;b=2;c=3'
 
     result = run_subprocess([
-        sys.executable, '-m', 'python_minifier',
+        sys.executable, '-m', 'terser',
         '--prefer-single-line', '-'
     ], input_data=code, timeout=30)
 

@@ -1,4 +1,4 @@
-import python_minifier.ast_compat as ast
+import terser.ast_compat as ast
 import keyword
 import string
 

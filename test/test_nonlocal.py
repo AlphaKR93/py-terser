@@ -2,7 +2,7 @@ import sys
 
 import pytest
 
-import python_minifier
+import terser
 
 
 def test_nonlocal_name():
@@ -29,7 +29,7 @@ result = test()
     exec(test_code, {}, unminified_locals)
     assert unminified_locals['result'] == 'inner'
 
-    minified = python_minifier.minify(test_code, rename_locals=True)
+    minified = terser.minify(test_code, rename_locals=True)
     print(minified)
     minified_locals = {}
     exec(minified, {}, minified_locals)
@@ -60,7 +60,7 @@ result = test()
     exec(test_code, {}, unminified_locals)
     assert unminified_locals['result'] == 2
 
-    minified = python_minifier.minify(test_code, rename_locals=True)
+    minified = terser.minify(test_code, rename_locals=True)
     print(minified)
     minified_locals = {}
     exec(minified, {}, minified_locals)
@@ -90,7 +90,7 @@ result = test()
     exec(test_code, {}, unminified_locals)
     assert unminified_locals['result'] is True
 
-    minified = python_minifier.minify(test_code, rename_locals=True)
+    minified = terser.minify(test_code, rename_locals=True)
     print(minified)
     minified_locals = {}
     exec(minified, {}, minified_locals)
@@ -120,7 +120,7 @@ result = test()
     exec(test_code, {}, unminified_locals)
     assert unminified_locals['result'] is True
 
-    minified = python_minifier.minify(test_code, rename_locals=True)
+    minified = terser.minify(test_code, rename_locals=True)
     print(minified)
     minified_locals = {}
     exec(minified, {}, minified_locals)

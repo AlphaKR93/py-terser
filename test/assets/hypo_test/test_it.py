@@ -1,16 +1,16 @@
-import python_minifier.ast_compat as ast
+import terser.ast_compat as ast
 
 from datetime import timedelta
 
 from hypothesis import HealthCheck, Verbosity, example, given, note, settings
 
-from python_minifier.ast_annotation import add_parent as add_parent_refs
-from python_minifier.ast_compare import compare_ast
-from python_minifier.ast_printer import print_ast
-from python_minifier.expression_printer import ExpressionPrinter
-from python_minifier.module_printer import ModulePrinter
-from python_minifier.rename.mapper import add_parent
-from python_minifier.transforms.constant_folding import FoldConstants
+from terser.ast_annotation import add_parent as add_parent_refs
+from terser.ast_compare import compare_ast
+from terser.ast_printer import print_ast
+from terser.expression_printer import ExpressionPrinter
+from terser.module_printer import ModulePrinter
+from terser.rename.mapper import add_parent
+from terser.transforms.constant_folding import FoldConstants
 
 from .expressions import Expression
 from .folding import FoldableExpression

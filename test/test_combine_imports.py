@@ -1,11 +1,11 @@
 import ast
 
 from helpers import print_namespace
-from python_minifier.ast_annotation import add_parent
+from terser.ast_annotation import add_parent
 
-from python_minifier.ast_compare import compare_ast
-from python_minifier.rename import add_namespace, bind_names, resolve_names
-from python_minifier.transforms.combine_imports import CombineImports
+from terser.ast_compare import compare_ast
+from terser.rename import add_namespace, bind_names, resolve_names
+from terser.transforms.combine_imports import CombineImports
 
 
 def combine_imports(module):
@@ -47,7 +47,7 @@ import functools as f
 import datetime
 
 pass'''
-    expected = '''import builtins, collections as c, functools as f, datetime
+    expected = '''import builtins, collections as c, datetime, functools as f
 pass'''
 
     expected_ast = ast.parse(expected)
@@ -77,7 +77,7 @@ def test_import_in_function():
     return None
 '''
     expected = '''def test():
-    import collection as c, builtins
+    import builtins, collection as c
     return None
 '''
 
@@ -96,7 +96,7 @@ from breakfast import bacon
     expected = '''
 from breakfast import hashbrown
 from breakfast import *
-from breakfast import sausage, bacon
+from breakfast import bacon, sausage
 '''
 
     expected_ast = ast.parse(expected)

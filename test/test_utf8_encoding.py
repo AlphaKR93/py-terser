@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import python_minifier
+import terser
 import tempfile
 import os
 import codecs
@@ -59,7 +59,7 @@ if __name__ == "__main__":
                 original_content = f.read()
 
         # This should work - minify the UTF-8 content
-        minified = python_minifier.minify(original_content)
+        minified = terser.minify(original_content)
 
         # Verify the minified code still contains the UTF-8 characters
         # On Python 2.7, Unicode characters in string literals are escaped but preserved
@@ -99,7 +99,7 @@ class UnicodeClass:
 '''
 
     # Test direct minification
-    minified = python_minifier.minify(source_code)
+    minified = terser.minify(source_code)
 
     # Verify UTF-8 characters are preserved by executing the minified code
     minified_globals = {}

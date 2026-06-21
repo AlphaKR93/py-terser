@@ -2,8 +2,8 @@
 For each node in an AST set the namespace to use for name binding and resolution
 """
 
-import terser.ast_compat as ast
-from terser.ast_annotation import get_parent
+import terser._ast as ast
+from terser._ast.annotation import get_parent
 
 from terser.rename.util import is_namespace
 

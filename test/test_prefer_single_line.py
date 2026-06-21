@@ -5,7 +5,7 @@ import os
 import tempfile
 
 from terser import minify, unparse
-from terser.ast_annotation import add_parent
+from terser._ast.annotation import add_parent
 from terser.rename import add_namespace
 
 from subprocess_compat import run_subprocess, safe_decode
@@ -108,11 +108,11 @@ def test_minify_imports():
     source = '''
 import os
 import sys
-a = 1
+a = os.name or sys.version
 '''
     # Imports are combined, module-level separator differs
-    expected_newlines = 'import os,sys\na=1'
-    expected_semicolons = 'import os,sys;a=1'
+    expected_newlines = 'import os,sys\na=os.name or sys.version'
+    expected_semicolons = 'import os,sys;a=os.name or sys.version'
     assert minify(source, prefer_single_line=False) == expected_newlines
     assert minify(source, prefer_single_line=True) == expected_semicolons
 

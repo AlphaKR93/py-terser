@@ -1,4 +1,4 @@
-import terser.ast_compat as ast
+import terser._ast as ast
 
 
 def is_constant_node(node, types):

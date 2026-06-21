@@ -1,4 +1,4 @@
-import terser.ast_compat as ast
+import terser._ast as ast
 from terser.transforms.suite_transformer import SuiteTransformer
 from terser.transforms.constant_folding import unparse_expression
 from terser.transforms.general_minifications import is_side_effect_free

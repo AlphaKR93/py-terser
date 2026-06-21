@@ -4,7 +4,7 @@ import sys
 import pytest
 
 from terser import minify
-from terser.ast_compare import compare_ast
+from terser._ast.compare import compare_ast
 
 
 def test_listcomp_regression_2_7():

@@ -1,6 +1,6 @@
 import sys
 
-import terser.ast_compat as ast
+import terser._ast as ast
 
 from terser.transforms.suite_transformer import SuiteTransformer
 

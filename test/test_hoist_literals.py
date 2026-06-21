@@ -4,9 +4,9 @@ import sys
 import pytest
 
 from terser import unparse
-from terser.ast_annotation import add_parent
-from terser.ast_compare import compare_ast
-from terser.ast_printer import print_ast
+from terser._ast.annotation import add_parent
+from terser._ast.compare import compare_ast
+from terser._ast.printer import print_ast
 from terser.rename import (
     add_namespace,
     allow_rename_globals,

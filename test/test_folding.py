@@ -4,8 +4,8 @@ import sys
 import pytest
 
 from terser import minify
-from terser.ast_annotation import add_parent
-from terser.ast_compare import compare_ast
+from terser._ast.annotation import add_parent
+from terser._ast.compare import compare_ast
 from terser.rename import add_namespace
 from terser.transforms.constant_folding import FoldConstants, equal_value_and_type
 

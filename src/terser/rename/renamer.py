@@ -1,4 +1,4 @@
-import terser.ast_compat as ast
+import terser._ast as ast
 
 from terser.rename.binding import NameBinding
 from terser.rename.name_generator import name_filter

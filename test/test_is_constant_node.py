@@ -62,7 +62,7 @@ def test_ast_compat_types_python314():
     if sys.version_info < (3, 14):
         pytest.skip('ast_compat types test only for Python 3.14+')
 
-    import terser.ast_compat as ast_compat
+    import terser._ast as ast_compat
 
     # Test that ast_compat provides the removed types
     assert is_constant_node(ast_compat.Str('a'), ast_compat.Str)
@@ -80,7 +80,7 @@ def test_ast_compat_constant_nodes_python314():
     if sys.version_info < (3, 14):
         pytest.skip('ast_compat constant test only for Python 3.14+')
 
-    import terser.ast_compat as ast_compat
+    import terser._ast as ast_compat
 
     # Test that Constant nodes work with ast_compat types
     assert is_constant_node(ast.Constant('a'), ast_compat.Str)

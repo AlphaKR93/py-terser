@@ -7,8 +7,8 @@ This assumes the standard NameAssigner and name_generator
 import ast
 
 from terser import unparse
-from terser.ast_annotation import add_parent
-from terser.ast_compare import CompareError, compare_ast
+from terser._ast.annotation import add_parent
+from terser._ast.compare import CompareError, compare_ast
 from terser.rename import add_namespace, allow_rename_globals, allow_rename_locals, bind_names, rename, resolve_names
 
 

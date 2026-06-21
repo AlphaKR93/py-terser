@@ -1,4 +1,4 @@
-import terser.ast_compat as ast
+import terser._ast as ast
 
 from terser.rename.util import arg_rename_in_place, insert
 

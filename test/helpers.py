@@ -1,5 +1,5 @@
-import terser.ast_compat as ast
-from terser.ast_annotation import add_parent
+import terser._ast as ast
+from terser._ast.annotation import add_parent
 
 from terser.rename import add_namespace, resolve_names
 from terser.rename.bind_names import bind_names

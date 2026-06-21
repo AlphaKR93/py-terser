@@ -1,6 +1,6 @@
 import sys
 
-import terser.ast_compat as ast
+import terser._ast as ast
 
 from terser.util import is_constant_node
 

@@ -3,8 +3,8 @@ import sys
 
 import pytest
 
-from terser.ast_annotation import add_parent
-from terser.ast_compare import compare_ast
+from terser._ast.annotation import add_parent
+from terser._ast.compare import compare_ast
 from terser.rename import add_namespace, bind_names, resolve_names
 from terser.transforms.remove_exception_brackets import remove_no_arg_exception_call
 

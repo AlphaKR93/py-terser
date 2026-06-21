@@ -8,5 +8,9 @@ dist/
 .pytest_cache/
 
 # development
+.idea/
 run/
 work/
+
+### Agents
+.claude/

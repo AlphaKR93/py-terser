@@ -1,138 +1,179 @@
-# Python Minifier
+# py-terser
 
-Transforms Python source code into its most compact representation.
+Transforms Python projects into its most compact representation.
+Fork of [dflook/python-minifier](https://github.com/dflook/python-minifier).
 
-[Try it out!](https://python-minifier.com)
+> [!WARNING]
+> This project was written in Antigravity CLI. I'm reviewing the code, but use it with caution.
 
-python-minifier currently supports Python 2.7 and Python 3.3 to 3.14. Previous releases supported Python 2.6.
+`py-terser` currently supports Python 3.10 to 3.14.
 
-* [PyPI](https://pypi.org/project/python-minifier/)
-* [Documentation](https://dflook.github.io/python-minifier/)
-* [Issues](https://github.com/dflook/python-minifier/issues)
+> [!NOTE]
+> This is for initial work after forking. Will be moved to [AlphaKR93/packages](https://github.com/AlphaKR93/packages) in the future.
 
 As an example, the following python source:
 
 ```python
-def handler(event, context):
-    l.info(event)
-    try:
-        i_token = hashlib.new('md5', (event['RequestId'] + event['StackId']).encode()).hexdigest()
-        props = event['ResourceProperties']
+from collections.abc import AsyncGenerator
+from typing import Annotated
 
-        if event['RequestType'] == 'Create':
-            event['PhysicalResourceId'] = 'None'
-            event['PhysicalResourceId'] = create_cert(props, i_token)
-            add_tags(event['PhysicalResourceId'], props)
-            validate(event['PhysicalResourceId'], props)
+from fastapi import FastAPI
+# ...
+from terser.hints import preserve_docstring
 
-            if wait_for_issuance(event['PhysicalResourceId'], context):
-                event['Status'] = 'SUCCESS'
-                return send(event)
-            else:
-                return reinvoke(event, context)
 
-        elif event['RequestType'] == 'Delete':
-            if event['PhysicalResourceId'] != 'None':
-                acm.delete_certificate(CertificateArn=event['PhysicalResourceId'])
-            event['Status'] = 'SUCCESS'
-            return send(event)
+app = FastAPI()
 
-        elif event['RequestType'] == 'Update':
+@preserve_docstring
+@app.get("/{path:path}", response_class=StreamingResponse)
+async def stream_parsed(
+    path: Annotated[str, Path()],
+    range_: Annotated[tuple[bool, int | str | None, int | str | None], Depends(...)],
+) -> AsyncGenerator[str]:
+    """
+    Returns parsed Markdown file via streaming response.
+    """
 
-            if replace_cert(event):
-                event['PhysicalResourceId'] = create_cert(props, i_token)
-                add_tags(event['PhysicalResourceId'], props)
-                validate(event['PhysicalResourceId'], props)
+    is_single_id, start, end = range_
+    markdown = await runtime_dir.resolve(path)
+    if not await markdown.is_file():
+        raise HTTPException(400)
 
-                if not wait_for_issuance(event['PhysicalResourceId'], context):
-                    return reinvoke(event, context)
-            else:
-                if 'Tags' in event['OldResourceProperties']:
-                    acm.remove_tags_from_certificate(CertificateArn=event['PhysicalResourceId'],
-                                                     Tags=event['OldResourceProperties']['Tags'])
+    composer = Composer()
+    frontmatter = FrontmatterProcessor()
+    async with await markdown.open('r') as file:
+        class StatusFlag(IntFlag):
+            INSIDE = auto()
+            COMPLETE = auto()
+            STRIP_LEADING = auto()
 
-                add_tags(event['PhysicalResourceId'], props)
+        line = 0
+        flag = StatusFlag(0)
+        async for content in file:
+            if not frontmatter.is_complete:
+                if frontmatter.process(content):
+                    continue
+                raise RuntimeError("Frontmatter was not processed correctly")
+            elif line == 0 and frontmatter.has_content:
+                if content == "\n":
+                    line += 1
+                    continue
+                raise OSError("File corrupted")
 
-            event['Status'] = 'SUCCESS'
-            return send(event)
+            composed: str = composer.compose(line, content)
+            line += 1
+            if isinstance(start, int):
+                assert isinstance(end, int)
+                if start >= line:
+                    continue
+                elif flag & StatusFlag.INSIDE and line > end:
+                    yield composed
+                    yield composer.collect()
+                    break
+                elif not flag & StatusFlag.INSIDE:
+                    flag |= StatusFlag.INSIDE
+                    continue
+            elif isinstance(start, str):
+                node = composer.current or composer.parent
+                if not isinstance(node, Element):
+                    if flag & StatusFlag.COMPLETE:
+                        break
+                    continue
+
+                assert isinstance(start, int)
+                boundary = end if flag & StatusFlag.COMPLETE else start if is_single_id else None
+                if not flag & StatusFlag.INSIDE and node._id == start:
+                    flag |= StatusFlag.INSIDE | StatusFlag.STRIP_LEADING
+                    continue
+                elif flag & StatusFlag.INSIDE and not flag & StatusFlag.COMPLETE and node._id == end:
+                    flag |= StatusFlag.COMPLETE
+                elif flag & StatusFlag.INSIDE and boundary and node._id != boundary and not node._id.startswith(boundary + "."):
+                    yield composed
+                    for _line in composer.collect().splitlines(keepends=True):
+                        if _line.startswith('\t</'):
+                            yield _line
+                        elif _line and _line[0].isdigit() and _line[-2:] == '\t\n':
+                            continue
+                        else:
+                            break
+                    break
+
+                if not flag & StatusFlag.INSIDE:
+                    continue
+
+            if line <= 1 and not composed:
+                continue
+
+            if flag & StatusFlag.STRIP_LEADING:
+                first_tab = composed.find('\t')
+                if first_tab > 0 and composed[first_tab:first_tab + 2] == '\t\n':
+                    composed = composed[composed.index('\n') + 1:]
+                flag &= ~StatusFlag.STRIP_LEADING
+
+            yield composed
         else:
-            raise RuntimeError('Unknown RequestType')
+            composer.close()
 
-    except Exception as ex:
-        l.exception('')
-        event['Status'] = 'FAILED'
-        event['Reason'] = str(ex)
-        return send(event)
+        yield composer.collect()
 ```
 
 Becomes:
 
-```python
-def handler(event,context):
-	L='OldResourceProperties';K='Tags';J='None';H='SUCCESS';G='RequestType';E='Status';D=context;B='PhysicalResourceId';A=event;l.info(A)
-	try:
-		F=hashlib.new('md5',(A['RequestId']+A['StackId']).encode()).hexdigest();C=A['ResourceProperties']
-		if A[G]=='Create':
-			A[B]=J;A[B]=create_cert(C,F);add_tags(A[B],C);validate(A[B],C)
-			if wait_for_issuance(A[B],D):A[E]=H;return send(A)
-			else:return reinvoke(A,D)
-		elif A[G]=='Delete':
-			if A[B]!=J:acm.delete_certificate(CertificateArn=A[B])
-			A[E]=H;return send(A)
-		elif A[G]=='Update':
-			if replace_cert(A):
-				A[B]=create_cert(C,F);add_tags(A[B],C);validate(A[B],C)
-				if not wait_for_issuance(A[B],D):return reinvoke(A,D)
-			else:
-				if K in A[L]:acm.remove_tags_from_certificate(CertificateArn=A[B],Tags=A[L][K])
-				add_tags(A[B],C)
-			A[E]=H;return send(A)
-		else:raise RuntimeError('Unknown RequestType')
-	except Exception as I:l.exception('');A[E]='FAILED';A['Reason']=str(I);return send(A)
+```py
+from collections.abc import AsyncGenerator as D
+from typing import Annotated as E
+from fastapi import FastAPI as F
+# ...
+app=F=F()
+@F.get('/{path:path}',response_class=J)
+async def stream_parsed(path:E[A,I()],range_:E[tuple[bool,P,P],H(...)])->D[A]:
+	'''Returns parsed Markdown file via streaming response.'''
+	D,E,F=range_;H=await K.resolve(path)
+	if not await H.is_file():raise G(400)
+	I=L();J=M()
+	async with await H.open('r')as K:
+		L=M=0
+		async for K in K:
+			if not M.is_complete:
+				if M.process(K):continue
+				raise RuntimeError('Frontmatter was not processed correctly')
+			if L==0and M.has_content:
+				if K=='\n':
+					L+=1;continue
+				raise OSError('File corrupted')
+			K=I.compose(L,K);L+=1
+			if O(E,B):
+				if E>=L:continue
+				if M&1and L>F:
+					yield K;yield I.collect();break
+				elif not M&1:
+					M|=1;continue
+			elif O(E,A):
+				G=I.current or I.parent
+				if not O(G,N):
+					if M&2:break
+					continue
+				H=F if M&2else E if D else C
+				if not M&1and G._id==E:
+					M|=5;continue
+				if M&1and not M&2and G._id==F:M|=2
+				elif M&1and H and G._id!=H and not G._id.startswith(H+'.'):
+					yield K
+					for G in I.collect().splitlines(keepends=True):
+						if G.startswith('\t</'):yield G
+						elif G and G[0].isdigit() and G[-2:]=='\t\n':continue
+						else:break
+					break
+				if not M&1:continue
+			if L<=1and not K:continue
+			if M&4:
+				G=K.find('\t')
+				if G and K[G:G+2]=='\t\n':K=K[K.index('\n')+1:]
+			yield K
+		else:I.close()
+		yield I.collect()
 ```
-
-## Why?
-
-AWS Cloudformation templates may have AWS lambda function source code embedded in them, but only if the function is less
-than 4KiB. I wrote this package so I could write python normally and still embed the module in a template.
-
-## Installation
-
-To install python-minifier use pip:
-
-```bash
-$ pip install python-minifier
-```
-
-Note that python-minifier depends on the python interpreter for parsing source code,
-and outputs source code compatible with the version of the interpreter it is run with.
-
-This means that if you minify code written for Python 3.11 using python-minifier running with Python 3.12,
-the minified code may only run with Python 3.12.
-
-python-minifier runs with and can minify code written for Python 2.7 and Python 3.3 to 3.14.
-
-## Usage
-
-To minify a source file, and write the minified module to stdout:
-
-```bash
-$ pyminify hello.py
-```
-
-There is also an API. The same example would look like:
-
-```python
-import python_minifier
-
-with open('hello.py') as f:
-    print(python_minifier.minify(f.read()))
-```
-
-Documentation is available at [dflook.github.io/python-minifier/](https://dflook.github.io/python-minifier/)
 
 ## License
 
-Available under the MIT License. Full text is in the [LICENSE](LICENSE) file.
-
-Copyright (c) 2024 Daniel Flook
+Available under the MIT License. Full text is in the [LICENSE.md](LICENSE.md) file.

@@ -1,4 +1,4 @@
-import terser.ast_compat as ast
+import terser._ast as ast
 
 class ImportedNamesCollector(ast.NodeVisitor):
     def __init__(self, current_module_name=None):
@@ -34,7 +34,10 @@ class ImportedNamesCollector(ast.NodeVisitor):
                 
         for alias in node.names:
             local_name = alias.asname or alias.name
-            self.imported_modules[local_name] = prefix + '.' + alias.name if prefix else alias.name
+            if not prefix:
+                self.imported_modules[local_name] = alias.name
+            else:
+                self.imported_modules[local_name] = prefix + '.' + alias.name
 
 
 def resolve_absolute_import_from(level, module, current_module):
@@ -67,6 +70,7 @@ class ModuleObfuscator(ast.NodeTransformer):
         self.current_module_name = current_module_name
         self.user_modules = user_modules
         self.reverse_module_name_map = {v: k for k, v in self.module_name_map.items()}
+        self.scope_depth = 0
         
         if isinstance(imported_modules, dict):
             self.imported_modules = imported_modules
@@ -77,9 +81,14 @@ class ModuleObfuscator(ast.NodeTransformer):
         
         if current_module_name:
             parts = current_module_name.split('.')
-            new_parts = [self.module_name_map.get(p, p) for p in parts]
-            self.obfuscated_module_name = '.'.join(new_parts)
-            self.obfuscated_package_name = '.'.join(new_parts[:-1]) if len(new_parts) > 1 else ""
+            if len(parts) > 1 and parts[-1] == '__init__':
+                new_parts = [self.module_name_map.get(p, p) for p in parts[:-1]]
+                self.obfuscated_module_name = '.'.join(new_parts)
+                self.obfuscated_package_name = '.'.join(new_parts)
+            else:
+                new_parts = [self.module_name_map.get(p, p) for p in parts]
+                self.obfuscated_module_name = '.'.join(new_parts)
+                self.obfuscated_package_name = '.'.join(new_parts[:-1]) if len(new_parts) > 1 else ""
         else:
             self.obfuscated_module_name = None
             self.obfuscated_package_name = None
@@ -94,17 +103,37 @@ class ModuleObfuscator(ast.NodeTransformer):
 
     def visit_ClassDef(self, node):
         if node.name in self.module_name_map:
-            node.name = self.module_name_map[node.name]
-        return self.generic_visit(node)
+            if isinstance(getattr(node, 'namespace', None), ast.Module):
+                node.name = self.module_name_map[node.name]
+        self.scope_depth += 1
+        res = self.generic_visit(node)
+        self.scope_depth -= 1
+        return res
 
     def visit_FunctionDef(self, node):
         if node.name in self.module_name_map:
-            node.name = self.module_name_map[node.name]
-        return self.generic_visit(node)
+            if isinstance(getattr(node, 'namespace', None), ast.Module):
+                node.name = self.module_name_map[node.name]
+        self.scope_depth += 1
+        res = self.generic_visit(node)
+        self.scope_depth -= 1
+        return res
 
     def visit_AsyncFunctionDef(self, node):
         if node.name in self.module_name_map:
-            node.name = self.module_name_map[node.name]
+            if isinstance(getattr(node, 'namespace', None), ast.Module):
+                node.name = self.module_name_map[node.name]
+        self.scope_depth += 1
+        res = self.generic_visit(node)
+        self.scope_depth -= 1
+        return res
+
+    def visit_Global(self, node):
+        node.names = [self.module_name_map.get(n, n) for n in node.names]
+        return self.generic_visit(node)
+
+    def visit_Nonlocal(self, node):
+        node.names = [self.module_name_map.get(n, n) for n in node.names]
         return self.generic_visit(node)
 
     def visit_Import(self, node):
@@ -128,10 +157,7 @@ class ModuleObfuscator(ast.NodeTransformer):
                 # Clear asname if it would be same as top-level module name (import X as X)
                 alias.asname = None if new_asname == new_parts[0] else new_asname
             else:
-                # Only set asname for dotted imports (import a.b → import x.y as x)
-                if len(parts) > 1:
-                    new_top = self.module_name_map.get(parts[0], parts[0])
-                    alias.asname = new_top if new_top != new_parts[0] else None
+                alias.asname = None
         return node
 
     def visit_ImportFrom(self, node):
@@ -160,7 +186,7 @@ class ModuleObfuscator(ast.NodeTransformer):
         return node
 
     def visit_Name(self, node):
-        if node.id == '__name__':
+        if node.id == '__name__' and isinstance(getattr(node, 'ctx', None), ast.Load):
             parent = getattr(node, '_parent', None)
             is_main_comparison = False
             if isinstance(parent, ast.Compare):
@@ -171,11 +197,42 @@ class ModuleObfuscator(ast.NodeTransformer):
                         is_main_comparison = True
             if not is_main_comparison and self.obfuscated_module_name:
                 return ast.Constant(value=self.obfuscated_module_name)
-        elif node.id == '__package__':
+        elif node.id == '__package__' and isinstance(getattr(node, 'ctx', None), ast.Load):
             if self.obfuscated_package_name is not None:
                 return ast.Constant(value=self.obfuscated_package_name)
         elif node.id in self.module_name_map:
-            node.id = self.module_name_map[node.id]
+            curr_ns = getattr(node, 'namespace', None)
+            is_local = False
+            binding = None
+            while curr_ns and not isinstance(curr_ns, ast.Module):
+                for b in getattr(curr_ns, 'bindings', []):
+                    if b.name == node.id:
+                        is_local = True
+                        binding = b
+                        break
+                if is_local:
+                    break
+                curr_ns = getattr(curr_ns, 'namespace', None)
+            if is_local and binding:
+                if any(isinstance(ref, ast.alias) for ref in binding.references):
+                    is_local = False
+            if is_local:
+                return node
+            is_non_user = False
+            if node.id in self.imported_modules:
+                abs_mod = self.imported_modules[node.id]
+                if self.user_modules:
+                    parts = abs_mod.split('.')
+                    is_user = False
+                    for i in range(1, len(parts) + 1):
+                        prefix = '.'.join(parts[:i])
+                        if prefix in self.user_modules:
+                            is_user = True
+                            break
+                    if not is_user:
+                        is_non_user = True
+            if not is_non_user:
+                node.id = self.module_name_map[node.id]
         return node
 
     def resolve_absolute_name(self, node):
@@ -242,4 +299,35 @@ class ModuleObfuscator(ast.NodeTransformer):
                     slice_node = slice_node.value
                 if isinstance(slice_node, (ast.Constant, ast.Str)):
                     self.obfuscate_arg_node(slice_node)
+        return self.generic_visit(node)
+
+    def visit_Constant(self, node):
+        if isinstance(node.value, str):
+            parent = getattr(node, '_parent', None)
+            if isinstance(parent, ast.Dict) and any(k is node for k in parent.keys):
+                return node
+            val = node.value
+            if val.startswith('.') and any(p in self.module_name_map for p in val.split('.') if p):
+                node.value = self.obfuscate_string(val)
+            elif self.user_modules and val in self.user_modules:
+                node.value = self.obfuscate_string(val)
+        return node
+
+    def visit_Str(self, node):
+        parent = getattr(node, '_parent', None)
+        if isinstance(parent, ast.Dict) and any(k is node for k in parent.keys):
+            return node
+        val = node.s
+        if val.startswith('.') and any(p in self.module_name_map for p in val.split('.') if p):
+            node.s = self.obfuscate_string(val)
+        elif self.user_modules and val in self.user_modules:
+            node.s = self.obfuscate_string(val)
+        return node
+
+    def visit_JoinedStr(self, node):
+        for val in node.values:
+            if isinstance(val, ast.Constant) and isinstance(val.value, str):
+                self.obfuscate_arg_node(val)
+            elif isinstance(val, ast.Str):
+                self.obfuscate_arg_node(val)
         return self.generic_visit(node)

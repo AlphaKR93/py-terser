@@ -4,7 +4,7 @@ import sys
 import pytest
 
 from terser import unparse
-from terser.ast_compare import compare_ast
+from terser._ast.compare import compare_ast
 
 
 def test_type_statement():

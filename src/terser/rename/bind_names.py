@@ -1,4 +1,4 @@
-import terser.ast_compat as ast
+import terser._ast as ast
 
 from terser.rename.binding import NameBinding
 from terser.rename.util import arg_rename_in_place, builtins, get_global_namespace
@@ -16,6 +16,25 @@ class NameBinder(NodeVisitor):
         assert isinstance(module, ast.Module)
         module.tainted = False
         module.preserved = set()
+        self.basemodels = {'BaseModel'}
+        while True:
+            added = False
+            for node in ast.walk(module):
+                if isinstance(node, ast.ClassDef):
+                    if node.name in self.basemodels:
+                        continue
+                    for base in node.bases:
+                        base_name = None
+                        if isinstance(base, ast.Name):
+                            base_name = base.id
+                        elif isinstance(base, ast.Attribute):
+                            base_name = base.attr
+                        if base_name in self.basemodels:
+                            self.basemodels.add(node.name)
+                            added = True
+                            break
+            if not added:
+                break
         return self.visit(module)
 
     def get_binding(self, name, namespace):
@@ -68,7 +87,10 @@ class NameBinder(NodeVisitor):
 
     def visit_ClassDef(self, node):
         if node.name not in node.namespace.nonlocal_names:
-            self.get_binding(node.name, node.namespace).add_reference(node)
+            binding = self.get_binding(node.name, node.namespace)
+            binding.add_reference(node)
+            if node.name in self.basemodels:
+                binding.disallow_rename()
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node):

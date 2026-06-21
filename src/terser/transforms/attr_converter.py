@@ -1,5 +1,5 @@
-import terser.ast_compat as ast
-from terser.ast_annotation import get_parent
+import terser._ast as ast
+from terser._ast.annotation import get_parent
 from terser.transforms.suite_transformer import SuiteTransformer
 
 def get_str_value(node):

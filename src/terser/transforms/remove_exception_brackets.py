@@ -10,8 +10,8 @@ We can't generally know if a name refers to an exception, so we only do this for
 
 import sys
 
-import terser.ast_compat as ast
-from terser.ast_annotation import get_parent, set_parent
+import terser._ast as ast
+from terser._ast.annotation import get_parent, set_parent
 
 from terser.rename.binding import BuiltinBinding
 

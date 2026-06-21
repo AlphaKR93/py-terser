@@ -1,4 +1,4 @@
-import terser.ast_compat as ast
+import terser._ast as ast
 
 from terser.rename.binding import BuiltinBinding, NameBinding
 from terser.rename.util import builtins, get_global_namespace, get_nonlocal_namespace

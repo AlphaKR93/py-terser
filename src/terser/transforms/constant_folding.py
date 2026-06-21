@@ -1,12 +1,11 @@
 import math
-import sys
 import re
 import unicodedata
 
-import terser.ast_compat as ast
-from terser.ast_annotation import get_parent
-from terser.ast_compare import compare_ast
-from terser.expression_printer import ExpressionPrinter
+import terser._ast as ast
+from terser._ast.annotation import get_parent
+from terser._ast.compare import compare_ast
+from terser.printer.expression_printer import ExpressionPrinter
 from terser.transforms.suite_transformer import SuiteTransformer
 from terser.util import is_constant_node
 
@@ -57,7 +56,7 @@ class ConstantTransformer(SuiteTransformer):
 class DebugConstantTransformer(ConstantTransformer):
     def visit_Name(self, node):
         if self.options.get('remove_debug', False):
-            if node.id in ('__debug__', 'TYPE_CHECKING'):
+            if node.id in ('__debug__', 'TYPE_CHECKING') and isinstance(getattr(node, 'ctx', None), ast.Load):
                 return self.add_child(ast.NameConstant(value=False), parent=get_parent(node), namespace=node.namespace)
         return node
 

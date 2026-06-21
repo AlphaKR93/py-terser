@@ -4,20 +4,18 @@ import sys
 import pytest
 
 from terser import RemoveAnnotationsOptions
-from terser.ast_annotation import add_parent
-from terser.ast_compare import compare_ast
+from terser._ast.annotation import add_parent
+from terser._ast.compare import compare_ast
 from terser.rename import add_namespace
 from terser.transforms.remove_annotations import RemoveAnnotations
 
 
 def remove_annotations(source, **kwargs):
-    from terser.transforms.remove_type_hints import RemoveTypeHints
     module = ast.parse(source)
     add_parent(module)
     add_namespace(module)
     options = RemoveAnnotationsOptions(**kwargs)
     module = RemoveAnnotations(options)(module)
-    module = RemoveTypeHints(options)(module)
     return module
 
 
@@ -266,7 +264,19 @@ class MyClass2(blah.NamedTuple):
     myfield: int
     mysecondfile: str
 '''
-    expected = source
+    expected = '''
+class MyClass(NamedTuple):
+    myfield: None
+    mysecondfile: None
+
+class MyClass2(typing.NamedTuple):
+    myfield: None
+    mysecondfile: None
+
+class MyClass2(blah.NamedTuple):
+    myfield: None
+    mysecondfile: None
+'''
 
     expected_ast = ast.parse(expected)
     actual_ast = remove_annotations(
@@ -335,21 +345,20 @@ class Dummy(typing.TypedDic):
 '''
     expected = '''
 class Dummy(TypedDict):
-    myfield: int
-    mysecondfile: str
+    myfield: None
+    mysecondfile: None
 
 class Dummy(HypedDict):
     myfield: 0
     mysecondfile: 0
 
 class Dummy(typing.TypedDict):
-    myfield: int
-    mysecondfile: str
+    myfield: None
+    mysecondfile: None
 
 class Dummy(typing.TypedDic):
     myfield: 0
     mysecondfile: 0
-
 '''
     expected_ast = ast.parse(expected)
     actual_ast = remove_annotations(

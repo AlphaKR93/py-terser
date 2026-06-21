@@ -1,7 +1,5 @@
-import terser.ast_compat as ast
-from terser.ast_annotation import get_parent, add_parent as add_node_parent
-
-from terser.rename.mapper import add_parent
+import terser._ast as ast
+from terser._ast.annotation import get_parent, add_parent as add_node_parent
 
 
 class NodeVisitor(object):
@@ -121,6 +119,12 @@ class SuiteTransformer(NodeVisitor):
 
         return node
 
+    def visit_ExceptHandler(self, node):
+        if node.type is not None:
+            node.type = self.visit(node.type)
+        node.body = self.suite(node.body, parent=node)
+        return node
+
     def visit_While(self, node):
         node.test = self.visit(node.test)
 
@@ -209,6 +213,7 @@ class SuiteTransformer(NodeVisitor):
         if namespace is None:
             namespace = nearest_function_namespace(parent)
 
+        from terser.rename.mapper import add_parent as rename_add_parent
         add_node_parent(child, parent=parent)
-        add_parent(child, namespace=namespace)
+        rename_add_parent(child, namespace=namespace)
         return child

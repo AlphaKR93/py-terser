@@ -1,0 +1,212 @@
+import builtins
+
+from alpha93.commons import type_checker
+
+from ..._ast import NodeVisitor, ast
+from ...parser.ref import ModuleRef, ref
+from .binding import NameBinding
+from .util import arg_rename_in_place, scope_ref_global
+
+if type_checker.TYPE_CHECKING:
+    from ...parser.ref import ContainsScope
+
+
+class NameBinder(NodeVisitor):
+    """
+    Create a NameBinding for each name that is bound
+
+    The NameBinding is added to the bindings dictionary in the namespace node the name is local to.
+    """
+
+    def __call__(self, module_ref: ModuleRef):
+        return self.visit(module_ref._ast)
+
+    def get_binding(self, name: str, namespace: ContainsScope):
+        namespace_ref = ref(namespace)
+        if name in namespace_ref.globals and not isinstance(namespace, ast.Module):
+            return self.get_binding(name, scope_ref_global(namespace)._ast)
+
+        # nonlocal names should not create a binding in any context
+        assert name not in namespace_ref.nonlocals
+
+        for binding in namespace_ref.bindings:
+            if binding.name == name:
+                break
+        else:  # weeee!
+            binding = NameBinding(name)
+            namespace_ref.bindings.append(binding)
+
+            if name in dir(builtins):
+                binding.disallow_rename()
+
+        if name in namespace_ref.nonlocals and isinstance(namespace, ast.Module):
+            # This is actually a syntax error - but we want the same syntax error after minifying!
+            binding.disallow_rename()
+
+        if isinstance(namespace, ast.ClassDef):
+            # This name will become an attribute of the class, so it can't be renamed
+            binding.disallow_rename()
+
+        return binding
+
+    def visit_Name(self, node: ast.Name):
+        namespace = ref(node).namespace
+        if node.id in ref(namespace).nonlocals:
+            # A nonlocal name does not create a binding.
+            # We will resolve the binding later
+            return
+
+        if isinstance(node.ctx, (ast.Store, ast.Del)):
+            self.get_binding(node.id, namespace).add_reference(node)
+
+        if isinstance(node.ctx, ast.Param):
+            binding = self.get_binding(node.id, namespace)
+
+            if arg_rename_in_place(node):
+                binding.add_reference(node)
+            else:
+                binding.add_reference(node, reserved=node.id)
+
+                if isinstance(namespace, ast.Lambda):
+                    # Lambda function arguments can't be renamed without breaking keyword arguments
+                    binding.disallow_rename()
+
+    def visit_ClassDef(self, node: ast.ClassDef):
+        namespace = ref(node).namespace
+        if node.name not in ref(namespace).nonlocals:
+            self.get_binding(node.name, namespace).add_reference(node)
+        self.generic_visit(node)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef):
+        namespace = ref(node).namespace
+        if node.name not in ref(namespace).nonlocals:
+            self.get_binding(node.name, namespace).add_reference(node)
+        self.generic_visit(node)
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
+        self.visit_FunctionDef(node)    # type: ignore[invalid-type]
+
+    def visit_alias(self, node: ast.alias):
+        if node.name == '*':
+            scope_ref_global(node).tainted = True
+
+        root_module = node.name.split('.')[0]
+
+        if root_module == 'timeit':
+            scope_ref_global(node).tainted = True
+
+        namespace = ref(node).namespace
+
+        if node.asname is not None:
+            if node.asname not in ref(namespace).nonlocals:
+                self.get_binding(node.asname, namespace).add_reference(node)
+        else:
+            # This binds the root module only for a dotted import
+
+            if root_module not in ref(namespace).nonlocals:
+                binding = self.get_binding(root_module, namespace)
+                binding.add_reference(node)
+
+                if '.' in node.name:
+                    binding.disallow_rename()
+
+    def visit_arguments(self, node: ast.arguments):
+        namespace = ref(node).namespace
+
+        # varargs, kwarg can't be nonlocal
+        if isinstance(node.vararg, str):
+            binding = self.get_binding(node.vararg, namespace)
+            binding.add_reference(node)
+
+        if isinstance(node.kwarg, str):
+            binding = self.get_binding(node.kwarg, namespace)
+            binding.add_reference(node)
+
+        self.generic_visit(node)
+
+    def visit_arg(self, node: ast.arg):
+        namespace = ref(node).namespace
+
+        # Args can't be nonlocal
+        binding = self.get_binding(node.arg, namespace)
+
+        if arg_rename_in_place(node):
+            binding.add_reference(node)
+        else:
+            binding.add_reference(node, reserved=node.arg)
+
+            if isinstance(namespace, ast.Lambda):
+                # Lambda function arguments can't be renamed without breaking keyword arguments
+                binding.disallow_rename()
+
+        self.generic_visit(node)
+
+    def visit_ExceptHandler(self, node: ast.ExceptHandler):
+        namespace = ref(node).namespace
+
+        if node.name is not None:
+            if isinstance(node.name, str) and node.name not in ref(namespace).nonlocals:
+                # python 3
+                self.get_binding(node.name, namespace).add_reference(node)
+            else:
+                # In python 2 the name is a Name node,
+                # which will be visited by generic_visit
+                pass
+
+        self.generic_visit(node)
+
+    def visit_Global(self, node: ast.Global):
+        for name in node.names:
+            self.get_binding(name, ref(node).namespace).add_reference(node)
+
+    def visit_MatchAs(self, node: ast.MatchAs):
+        namespace = ref(node).namespace
+        if node.name is not None and node.name not in ref(namespace).nonlocals:
+            self.get_binding(node.name, namespace).add_reference(node)
+
+        self.generic_visit(node)
+
+    def visit_MatchStar(self, node: ast.MatchStar):
+        namespace = ref(node).namespace
+        if node.name is not None and node.name not in ref(namespace).nonlocals:
+            self.get_binding(node.name, namespace).add_reference(node)
+
+        self.generic_visit(node)
+
+    def visit_MatchMapping(self, node: ast.MatchMapping):
+        namespace = ref(node).namespace
+        if node.rest is not None and node.rest not in ref(namespace).nonlocals:
+            self.get_binding(node.rest, namespace).add_reference(node)
+
+        self.generic_visit(node)
+
+    def visit_TypeVar(self, node: ast.TypeVar):
+        namespace = ref(node).namespace
+        if node.name not in ref(namespace).nonlocals:
+            self.get_binding(node.name, namespace).add_reference(node)
+
+        scope_ref_global(namespace).preserved.add(node.name)
+
+    def visit_TypeVarTuple(self, node: ast.TypeVarTuple):
+        namespace = ref(node).namespace
+        if node.name not in ref(namespace).nonlocals:
+            self.get_binding(node.name, namespace).add_reference(node)
+
+        scope_ref_global(namespace).preserved.add(node.name)
+
+    def visit_ParamSpec(self, node: ast.ParamSpec):
+        namespace = ref(node).namespace
+        if node.name not in ref(namespace).nonlocals:
+            self.get_binding(node.name, namespace).add_reference(node)
+
+        scope_ref_global(namespace).preserved.add(node.name)
+
+
+def bind(module: ast.Module):
+    """
+    Bind names to their local namespace
+
+    :param module: The module to bind names in
+    """
+
+    NameBinder()(ref(module))

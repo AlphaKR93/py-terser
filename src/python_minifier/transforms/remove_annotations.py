@@ -1,7 +1,7 @@
 import sys
 
-import python_minifier.ast_compat as ast
-from python_minifier.ast_annotation import get_parent
+import python_minifier._ast.ast as ast
+from python_minifier._ast.annotation import get_parent
 
 from python_minifier.transforms.remove_annotations_options import RemoveAnnotationsOptions
 from python_minifier.transforms.suite_transformer import SuiteTransformer
@@ -126,7 +126,7 @@ class RemoveAnnotations(SuiteTransformer):
         else:
             # Valueless annotations cause the interpreter to treat the variable as a local.
             # I don't know of another way to do that without assigning to it, so
-            # keep it as an AnnAssign, but replace the annotation with '0'
+            # keep it as an AnnAssign, but replace the ref with '0'
 
             node.annotation = self.add_child(ast.Num(0), parent=get_parent(node), namespace=node.namespace)
             return node

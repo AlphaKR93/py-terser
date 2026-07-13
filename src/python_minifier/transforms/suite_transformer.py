@@ -1,17 +1,26 @@
-import python_minifier.ast_compat as ast
-from python_minifier.ast_annotation import get_parent, add_parent as add_node_parent
+from abc import ABC
+from typing import TYPE_CHECKING, override
 
-from python_minifier.rename.mapper import add_parent
+from .._ast import ast
+from .._ast.annotation import get_parent, add_parent as add_node_parent
+
+from ..rename.mapper import add_parent
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
-class NodeVisitor(object):
-    def visit(self, node):
+class NodeVisitor(ast.NodeVisitor, ABC):
+    def __visitor(self, name: str) -> Callable[[ast.AST], ast.AST]:
+        return getattr(self, f"visit_{name}", self.generic_visit)
+
+    @override
+    def visit(self, node: ast.AST):
         """Visit a node."""
-        method = 'visit_' + node.__class__.__name__
-        visitor = getattr(self, method, self.generic_visit)
-        return visitor(node)
+        return self.__visitor(node.__class__.__name__)(node)
 
-    def generic_visit(self, node):
+    @override
+    def generic_visit(self, node: ast.AST):
         """Called if no explicit visitor function exists for a node."""
         for _field, value in ast.iter_fields(node):
             if isinstance(value, list):
@@ -21,25 +30,26 @@ class NodeVisitor(object):
             elif isinstance(value, ast.AST):
                 self.visit(value)
 
-    def visit_Constant(self, node):
+    @override
+    def visit_Constant(self, node: ast.Constant):
+        name: str
         if node.value in [None, True, False]:
-            method = 'visit_NameConstant'
+            name = "NameConstant"
         elif isinstance(node.value, (int, float, complex)):
-            method = 'visit_Num'
+            name = "Num"
         elif isinstance(node.value, str):
-            method = 'visit_Str'
+            name = "Str"
         elif isinstance(node.value, bytes):
-            method = 'visit_Bytes'
+            name = "Bytes"
         elif node.value == Ellipsis:
-            method = 'visit_Ellipsis'
+            name = "Ellipsis"
         else:
-            raise RuntimeError('Unknown Constant value %r' % type(node.value))
+            raise RuntimeError(f"Unknown Constant value type {type(node.value)}")
 
-        visitor = getattr(self, method, self.generic_visit)
-        return visitor(node)
+        return self.__visitor(name)(node)
 
 
-class SuiteTransformer(NodeVisitor):
+class SuiteTransformer(NodeVisitor, ABC):
     """
     Transform suites of instructions
     """

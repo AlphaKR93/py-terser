@@ -2,18 +2,19 @@
 For each node in an AST set the namespace to use for name binding and resolution
 """
 
-import python_minifier.ast_compat as ast
-from python_minifier.ast_annotation import get_parent
+from .._ast import ast
+from .._ast.annotation import get_parent
 
 from python_minifier.rename.util import is_namespace
 
 
-def add_parent_to_arguments(arguments, func):
+def add_parent_to_arguments(arguments: ast.arguments, func: ast.Lambda):
     arguments.namespace = func
 
-    for arg in getattr(arguments, 'posonlyargs', []) + arguments.args:
+    for arg in getattr(arguments, "posonlyargs", []) + arguments.args:
+        arg: ast.arg
         add_parent(arg, func)
-        if hasattr(arg, 'annotation') and arg.annotation is not None:
+        if hasattr(arg, 'ref') and arg.annotation is not None:
             add_parent(arg.annotation, func.namespace)
 
     if hasattr(arguments, 'kwonlyargs'):
@@ -46,7 +47,7 @@ def add_parent_to_arguments(arguments, func):
             add_parent(arguments.kwarg, func)
 
 
-def add_parent_to_functiondef(functiondef):
+def add_parent_to_functiondef(functiondef: ast.FunctionDef | ast.AsyncFunctionDef):
     """
     Add correct parent and namespace attributes to functiondef nodes
     """
@@ -68,7 +69,7 @@ def add_parent_to_functiondef(functiondef):
         add_parent(functiondef.returns, namespace=functiondef.namespace)
 
 
-def add_parent_to_classdef(classdef):
+def add_parent_to_classdef(classdef: ast.ClassDef):
     """
     Add correct parent and namespace attributes to classdef nodes
     """
@@ -97,9 +98,7 @@ def add_parent_to_classdef(classdef):
             add_parent(node, namespace=classdef.namespace)
 
 
-def add_parent_to_comprehension(node, namespace):
-    assert isinstance(node, (ast.GeneratorExp, ast.SetComp, ast.DictComp, ast.ListComp))
-
+def add_parent_to_comprehension(node: ast.GeneratorExp | ast.SetComp | ast.DictComp | ast.ListComp, namespace):
     if hasattr(node, 'elt'):
         add_parent(node.elt, namespace=node)
     elif hasattr(node, 'key'):
@@ -134,7 +133,7 @@ def add_parent_to_namedexpr(node):
     add_parent(node.target, namespace=namedexpr_namespace(node.namespace))
     add_parent(node.value, namespace=node.namespace)
 
-def add_parent(node, namespace=None):
+def add_parent(node: ast.AST, namespace: ast.AST | None = None):
     """
     Add a namespace attribute to child nodes
 

@@ -1,9 +1,11 @@
-import python_minifier.ast_compat as ast
+from abc import ABC, abstractmethod
+from typing import override
 
-from python_minifier.rename.util import arg_rename_in_place, insert
+from .._ast import ast
+from .util import arg_rename_in_place, insert
 
 
-class Binding(object):
+class Binding(ABC):
     """
     Represents the binding of a name
 
@@ -263,26 +265,21 @@ class Binding(object):
         if reserved is not None:
             self._reserved = reserved
 
-    def should_rename(self, new_name):
+    @abstractmethod
+    def should_rename(self, new_name: str) -> bool:
         """
         Is it space efficient to rename this binding
 
         :param str new_name: The candidate name
-        :rtype: bool
-
         """
 
-        raise NotImplementedError
-
-    def rename(self, new_name):
+    @abstractmethod
+    def rename(self, new_name: str) -> None:
         """
         Rename this binding and all nodes that reference it
 
         :param str new_name: The new name to use
-
         """
-
-        raise NotImplementedError
 
 
 class NameBinding(Binding):
@@ -298,24 +295,18 @@ class NameBinding(Binding):
     """
 
     def __init__(self, name, *args, **kwargs):
-        super(NameBinding, self).__init__(name, *args, **kwargs)
+        super().__init__(name, *args, **kwargs)
 
         if name.startswith('__') and name.endswith('__'):
             # System defined name
             self.disallow_rename()
 
+    @override
     def __repr__(self):
-        return self.__class__.__name__ + '(name=%r, allow_rename=%r) <references=%r>' % (self._name, self._allow_rename, len(self._references))
+        return self.__class__.__name__ + f"({self.name=}, {self.allow_rename=}) <references={len(self._references)}>"
 
+    @override
     def should_rename(self, new_name):
-        """
-        Is it space efficient to rename this binding
-
-        :param str new_name: The candidate name
-        :rtype: bool
-
-        """
-
         current_cost = len(self.references) * len(self._name)
 
         old_mentions = self.old_mention_count()
@@ -326,50 +317,21 @@ class NameBinding(Binding):
         return rename_cost <= current_cost
 
     def disallow_rename(self):
-        """
-        Prevent this binding from being renamed
-        """
-
-        super(NameBinding, self).disallow_rename()
+        super().disallow_rename()
         self._reserved = self._name
 
     def rename(self, new_name):
-        """
-        Rename this binding and all nodes that reference it
-
-        :param str new_name: The new name to use
-
-        """
-
         func_namespace_binding = None
 
         for node in self.references:
-
             if isinstance(node, ast.Name):
-
-                if isinstance(node.ctx, (ast.Load, ast.Store, ast.Del)):
-                    node.id = new_name
-                else:
-                    # Python 2 Param context
-
-                    if arg_rename_in_place(node):
-                        node.id = new_name
-
-                    else:
-                        if func_namespace_binding is None:
-                            func_namespace_binding = node.namespace
-                        else:
-                            assert func_namespace_binding is node.namespace
-
+                node.id = new_name
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 node.name = new_name
             elif isinstance(node, ast.ClassDef):
                 node.name = new_name
             elif isinstance(node, ast.alias):
-                if new_name == node.name:
-                    node.asname = None
-                else:
-                    node.asname = new_name
+                node.asname = None if new_name == node.name else new_name
             elif isinstance(node, ast.arg):
 
                 if arg_rename_in_place(node):

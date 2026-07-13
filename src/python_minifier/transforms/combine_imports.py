@@ -1,6 +1,6 @@
-import python_minifier.ast_compat as ast
+from python_minifier._ast import ast as ast
 
-from python_minifier.transforms.suite_transformer import SuiteTransformer
+from .suite_transformer import SuiteTransformer
 
 
 class CombineImports(SuiteTransformer):
@@ -10,6 +10,11 @@ class CombineImports(SuiteTransformer):
     This doesn't change the order of imports
 
     """
+    def suite(self, node_list, parent):
+        a = list(self._combine_import(node_list, parent))
+        b = list(self._combine_import_from(a, parent))
+
+        return [self.visit(n) for n in b]
 
     def _combine_import(self, node_list, parent):
 
@@ -67,9 +72,3 @@ class CombineImports(SuiteTransformer):
             yield self.add_child(
                 ast.ImportFrom(module=prev_import.module, names=alias, level=prev_import.level), parent=parent, namespace=prev_import.namespace
             )
-
-    def suite(self, node_list, parent):
-        a = list(self._combine_import(node_list, parent))
-        b = list(self._combine_import_from(a, parent))
-
-        return [self.visit(n) for n in b]

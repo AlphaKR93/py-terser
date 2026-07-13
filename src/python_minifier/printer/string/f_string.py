@@ -10,13 +10,13 @@ import copy
 import re
 import sys
 
-import python_minifier.ast_compat as ast
+import python_minifier._ast.ast as ast
 
 from python_minifier import UnstableMinification
-from python_minifier.ast_compare import CompareError, compare_ast
-from python_minifier.expression_printer import ExpressionPrinter
-from python_minifier.ministring import MiniString
-from python_minifier.token_printer import TokenTypes
+from python_minifier._ast.compare import CompareError, compare_ast
+from python_minifier.printer.expression_printer import ExpressionPrinter
+from python_minifier.printer.string.ministring import MiniString
+from python_minifier.printer.token_printer import TokenTypes
 from python_minifier.util import is_constant_node
 
 

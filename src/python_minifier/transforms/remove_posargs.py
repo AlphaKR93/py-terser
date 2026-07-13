@@ -1,4 +1,4 @@
-import python_minifier.ast_compat as ast
+import python_minifier._ast.ast as ast
 
 
 def remove_posargs(node):

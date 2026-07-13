@@ -10,8 +10,8 @@ We can't generally know if a name refers to an exception, so we only do this for
 
 import sys
 
-import python_minifier.ast_compat as ast
-from python_minifier.ast_annotation import get_parent, set_parent
+import python_minifier._ast.ast as ast
+from python_minifier._ast.annotation import get_parent, set_parent
 
 from python_minifier.rename.binding import BuiltinBinding
 

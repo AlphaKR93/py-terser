@@ -11,13 +11,13 @@ This implementation is much simpler than f_string.py because:
 - Always use all quote types
 """
 
-import python_minifier.ast_compat as ast
+import python_minifier._ast.ast as ast
 
 from python_minifier import UnstableMinification
-from python_minifier.ast_compare import CompareError, compare_ast
-from python_minifier.expression_printer import ExpressionPrinter
-from python_minifier.ministring import MiniString
-from python_minifier.token_printer import TokenTypes
+from python_minifier._ast.compare import CompareError, compare_ast
+from python_minifier.printer.expression_printer import ExpressionPrinter
+from python_minifier.printer.string.ministring import MiniString
+from python_minifier.printer.token_printer import TokenTypes
 from python_minifier.util import is_constant_node
 
 
@@ -61,8 +61,8 @@ class TString(object):
         if value_node.format_spec is not None:
             # Handle format specifications in debug specifiers
             if isinstance(value_node.format_spec, ast.JoinedStr):
-                import python_minifier.f_string
-                format_specs = python_minifier.f_string.FormatSpec(value_node.format_spec, self.allowed_quotes, pep701=True).candidates()
+                import python_minifier.printer.string.f_string
+                format_specs = python_minifier.printer.string.f_string.FormatSpec(value_node.format_spec, self.allowed_quotes, pep701=True).candidates()
                 conversion_candidates = [c + ':' + fs for c in conversion_candidates for fs in format_specs]
 
         return [x + '}' for x in conversion_candidates]
@@ -221,9 +221,9 @@ class InterpolationValue(ExpressionPrinter):
 
             # Format spec is a JoinedStr (f-string) in the AST
             if isinstance(self.node.format_spec, ast.JoinedStr):
-                import python_minifier.f_string
+                import python_minifier.printer.string.f_string
                 # Use f-string processing for format specs
-                format_candidates = python_minifier.f_string.OuterFString(
+                format_candidates = python_minifier.printer.string.f_string.OuterFString(
                     self.node.format_spec, pep701=True
                 ).candidates()
                 # Remove the f/rf prefix and quotes to get just the format part
@@ -285,11 +285,11 @@ class InterpolationValue(ExpressionPrinter):
         """Handle constant values in interpolations"""
         if isinstance(node.value, str):
             # Use Str class from f_string module for string handling
-            from python_minifier.f_string import Str
+            from python_minifier.printer.string.f_string import Str
             self.printer.append(str(Str(node.value, self.allowed_quotes, pep701=True)), TokenTypes.NonNumberLiteral)
         elif isinstance(node.value, bytes):
             # Use Bytes class from f_string module for bytes handling
-            from python_minifier.f_string import Bytes
+            from python_minifier.printer.string.f_string import Bytes
             self.printer.append(str(Bytes(node.value, self.allowed_quotes)), TokenTypes.NonNumberLiteral)
         else:
             # Other constants (numbers, None, etc.)
@@ -309,9 +309,9 @@ class InterpolationValue(ExpressionPrinter):
         if self.printer.previous_token in [TokenTypes.Identifier, TokenTypes.Keyword, TokenTypes.SoftKeyword]:
             self.printer.delimiter(' ')
 
-        import python_minifier.f_string
+        import python_minifier.printer.string.f_string
         # F-strings nested in t-strings also benefit from PEP 701
-        self._append(python_minifier.f_string.OuterFString(node, pep701=True).candidates())
+        self._append(python_minifier.printer.string.f_string.OuterFString(node, pep701=True).candidates())
 
     def visit_Lambda(self, node):
         """Handle lambda expressions in interpolations"""

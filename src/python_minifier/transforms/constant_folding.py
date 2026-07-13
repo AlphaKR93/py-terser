@@ -1,11 +1,11 @@
 import math
 import sys
 
-import python_minifier.ast_compat as ast
-from python_minifier.ast_annotation import get_parent
+import python_minifier._ast.ast as ast
+from python_minifier._ast.annotation import get_parent
 
-from python_minifier.ast_compare import compare_ast
-from python_minifier.expression_printer import ExpressionPrinter
+from python_minifier._ast.compare import compare_ast
+from python_minifier.printer.expression_printer import ExpressionPrinter
 from python_minifier.transforms.suite_transformer import SuiteTransformer
 from python_minifier.util import is_constant_node
 

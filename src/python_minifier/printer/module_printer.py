@@ -1,6 +1,6 @@
 import sys
 
-import python_minifier.ast_compat as ast
+import python_minifier._ast.ast as ast
 
 from .expression_printer import ExpressionPrinter
 from .token_printer import Delimiter

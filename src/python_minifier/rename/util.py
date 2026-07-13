@@ -1,40 +1,27 @@
-import sys
+from warnings import deprecated
 
-import python_minifier.ast_compat as ast
-
-from python_minifier.util import is_constant_node
-
-
-def create_is_namespace():
-
-    namespace_nodes = (ast.FunctionDef, ast.Lambda, ast.ClassDef, ast.Module, ast.GeneratorExp)
-
-    if sys.version_info >= (2, 7):
-        namespace_nodes += (ast.SetComp, ast.DictComp)
-
-    if sys.version_info >= (3, 0):
-        namespace_nodes += (ast.ListComp,)
-
-    if sys.version_info >= (3, 5):
-        namespace_nodes += (ast.AsyncFunctionDef,)
-
-    return lambda node: isinstance(node, namespace_nodes)
+from .._ast import ast
+from ..util import is_constant_node
 
 
-is_namespace = create_is_namespace()
+NAMESPACED = (
+    ast.FunctionDef,
+    ast.Lambda,
+    ast.ClassDef,
+    ast.Module,
+    ast.GeneratorExp,
+    ast.SetComp,
+    ast.DictComp,
+    ast.ListComp,
+    ast.AsyncFunctionDef,
+)
+
+@deprecated("not necessary")
+def is_namespace(node: ast.AST):
+    return isinstance(node, NAMESPACED)
 
 
-def iter_child_namespaces(node):
-
-    for child in ast.iter_child_nodes(node):
-        if is_namespace(child):
-            yield child
-        else:
-            for c in iter_child_namespaces(child):
-                yield c
-
-
-def get_global_namespace(node):
+def get_global_namespace(node: ast.AST):
     """
     Return the global namespace for a node
 
@@ -48,7 +35,7 @@ def get_global_namespace(node):
     return get_global_namespace(node.namespace)
 
 
-def get_nonlocal_namespace(node):
+def get_nonlocal_namespace(node: ast.AST):
     """
     Return the nonlocal namespace for a node
 
@@ -61,7 +48,7 @@ def get_nonlocal_namespace(node):
     return node.namespace
 
 
-def arg_rename_in_place(node):
+def arg_rename_in_place(node: ast.AST):
     """
     Can this argument node by safely renamed
 

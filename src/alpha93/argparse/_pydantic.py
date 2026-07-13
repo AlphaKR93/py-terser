@@ -1,0 +1,118 @@
+import argparse
+import typing
+from collections.abc import Iterable
+from dataclasses import is_dataclass
+from enum import EnumType
+from types import UnionType
+from typing import TYPE_CHECKING, Any, Annotated, get_args, override
+
+from alpha93.commons.pydantic import dataclasses
+from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from pydantic.fields import FieldInfo
+
+    type ArgParse = argparse._ActionsContainer
+
+
+if TYPE_CHECKING:
+    type MutuallyExclusive[T] = Annotated[T, ...]
+else:
+    class MutuallyExclusive:
+        def __class_getitem__(cls, item: Any) -> Any:
+            return Annotated[item, cls()]
+
+        @override
+        def __hash__(self) -> int:
+            return hash(type(self))
+
+UnionConstructor: Any = UnionType
+LiteralGenericAlias = getattr(typing, "_LiteralGenericAlias")
+
+
+class _ModelArgumentBuilder:
+    __LOCK = object()
+
+    def __init__(self, lock: object, parser: argparse.ArgumentParser):
+        if lock is not _ModelArgumentBuilder.__LOCK:
+            raise RuntimeError("Lock object does not match")
+
+        self.parser = parser
+
+    @staticmethod
+    def from_model(parser: argparse.ArgumentParser, model: type[BaseModel]):
+        _ModelArgumentBuilder(_ModelArgumentBuilder.__LOCK, parser).__iter_fields(parser, model)
+
+    def __iter_fields(self, args: ArgParse, model: type[BaseModel]):
+        if is_dataclass(model):
+            model = dataclasses.to_model(model) # type: ignore[invalid-type]
+
+        model_fields: dict[str, FieldInfo] = model.model_fields
+        for field, field_info in model_fields.items():
+            annotation: type[BaseModel] = field_info.annotation # type: ignore[invalid-type]
+            if MutuallyExclusive in field_info.metadata:
+                if BaseModel not in annotation.mro() and not is_dataclass(annotation):
+                    raise ValueError
+
+                group = self.parser.add_mutually_exclusive_group(required=field_info.is_required())
+                self.__iter_fields(group, annotation)   # type: ignore[invalid-type]
+                continue
+
+            types: list[Any] = [annotation]
+            if isinstance(annotation, UnionType):
+                types = list(get_args(annotation))
+
+            models = set(filter(lambda x: isinstance(x, type(BaseModel)) or is_dataclass(x), types))
+            if not len(models):
+                self.__add_arg(args, field, field_info, annotation) # type: ignore[invalid-type]
+                continue
+
+            group = self.parser.add_argument_group(
+                title=field,
+                description=field_info.description,
+                argument_default=field_info.default,
+            )
+
+            if len(type_params := set(types) - models):
+                annotation = UnionConstructor[tuple(type_params)]
+                self.__add_arg(group, field, field_info, annotation) # type: ignore[invalid-type]
+
+            for type_param in models:
+                self.__iter_fields(group, type_param)       # type: ignore[invalid-type]
+
+    def __add_arg(self, parser: ArgParse, field: str, field_info: FieldInfo, model: type):
+        if isinstance(model, type(BaseModel)) or is_dataclass(model):
+            self.__iter_fields(parser, model)   # type: ignore[invalid-type]
+            return
+
+        choices = None
+        if model is bool:
+            choices = [True, False]
+        elif isinstance(model, LiteralGenericAlias):
+            choices = get_args(model)
+        elif isinstance(model, EnumType):
+            choices = list(model.__members__)
+            if not len(choices):
+                choices = None
+
+        action, nargs = "store", None
+        if isinstance(model, Iterable):
+            action, nargs = "append", '+'
+
+        if isinstance(model, UnionType):
+            model = None
+
+        parser.add_argument(
+            "--" + field.replace('_', '-'),
+            action=action,
+            nargs=nargs,
+            default=field_info.default,
+            type=model, # type: ignore[invalid-type]
+            choices=choices,
+            required=field_info.is_required(),
+            help=field_info.description,
+            dest=field,
+            deprecated=field_info.deprecated,
+        )
+
+arguments_from_model = _ModelArgumentBuilder.from_model

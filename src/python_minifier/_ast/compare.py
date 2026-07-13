@@ -1,4 +1,4 @@
-import python_minifier.ast_compat as ast
+from . import ast
 
 
 class CompareError(RuntimeError):

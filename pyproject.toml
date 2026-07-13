@@ -5,7 +5,9 @@ authors = [
     { name = "Alpha", email = "dev@alpha93.kr" }
 ]
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "anyio>=4.14.2",
+]
 
 [dependency-groups]
 cli = [

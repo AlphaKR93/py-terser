@@ -4,11 +4,11 @@ a 'minified' representation of the same source code.
 
 """
 
-from .terser import minify, unparse
+#from .terser import minify, unparse
 
 version = "0.1.0"
 
-__all__ = (
-    "minify",
-    "unparse",
-)
+#__all__ = (
+#    "minify",
+#    "unparse",
+#)

@@ -1,7 +1,7 @@
 import ast
 from abc import ABC
 from ast import AST
-from typing import overload
+from typing import overload, ClassVar
 
 from . import ModuleRef
 from terser._pipeline.parser.ref._scoped import ScopedNode
@@ -13,10 +13,14 @@ type ContainsScope = ast.Module | ast.ClassDef | Invokable | Comprehension
 
 
 class NodeRef[T: AST](ABC):
+    _klass: ClassVar[dict[type[ast.AST], type[NodeRef]]]
     _ast: T
     _parent: AST
 
     namespace: ContainsScope
+
+    @classmethod
+    def new(cls, node: T, parent: AST) -> NodeRef[T]: ...
 
     def __init__(self, node: T, parent: AST) -> None: ...
     def _resolve_all(self) -> None: ...

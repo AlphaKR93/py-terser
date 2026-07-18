@@ -1,6 +1,6 @@
 from alpha93.commons import type_checker
 
-from terser._ast import ast
+from terser.ast_compat import ast
 from ._node import NodeRef
 
 if type_checker.TYPE_CHECKING:
@@ -32,6 +32,9 @@ class ScopedNode[T: ContainsScope](NodeRef[T]):
         self.bindings = []
         self.globals = set()
         self.nonlocals = set()
+
+for k in SCOPED_T:
+    NodeRef._klass[k] = ScopedNode
 
 def is_scoped(node: ast.AST) -> TypeGuard[ContainsScope]:
     return isinstance(node, SCOPED_T)

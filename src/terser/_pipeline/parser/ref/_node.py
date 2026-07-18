@@ -1,7 +1,7 @@
 import ast
-from alpha93.commons import type_checker
+from typing import TYPE_CHECKING, ClassVar
 
-if type_checker.TYPE_CHECKING:
+if TYPE_CHECKING:
     from ast import AST
     from typing import Final
 
@@ -10,6 +10,7 @@ _FIELD = "__AST_NodeRef__ref__"
 
 
 class NodeRef[T: AST]:
+    _klass: ClassVar[dict[type[ast.AST], type[NodeRef]]] = {}
     _ast: Final[T]
     _parent: AST
 
@@ -20,9 +21,16 @@ class NodeRef[T: AST]:
         if parent:  # INTENDED: for ModuleRef
             self._parent = parent
 
+    @classmethod
+    def new(cls, node: ast.AST, parent: ast.AST):
+        if cls_ := NodeRef._klass.get(type(node)):
+            return cls_(node, parent)
+
+        return cls(node, parent)
+
     def _resolve_all(self):
         for node in ast.iter_child_nodes(self._ast):
-            NodeRef(node, self._ast)._resolve_all()
+            NodeRef.new(node, self._ast)._resolve_all()
 
     def __repr__(self):
         r = {i: f"{j.__class__.__name__}(...)" if isinstance(j, ast.AST) else repr(j) for i, j in self.__dict__.items()}

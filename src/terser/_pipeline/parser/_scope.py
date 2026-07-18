@@ -4,7 +4,7 @@ For each node in an AST set the namespace to use for name binding and resolution
 
 from alpha93.commons import type_checker, typed
 
-from terser._ast import ast
+from terser.ast_compat import ast
 from .ref import ref, is_scoped
 
 if type_checker.TYPE_CHECKING:
@@ -15,10 +15,15 @@ class ScopeResolver:
     __LOCK = object()
 
 
-    @staticmethod
-    def resolve(node_ref: ModuleRef):
+    @classmethod
+    def module(cls, node_ref: ModuleRef):
         node = node_ref._ast
-        ScopeResolver(ScopeResolver.__LOCK).__resolve(node, namespace=node)
+        cls(ScopeResolver.__LOCK).__resolve(node, namespace=node)
+
+
+    @classmethod
+    def child(cls, node: ast.AST, *, namespace: ContainsScope):
+        cls(ScopeResolver.__LOCK).__resolve(node, namespace=namespace)
 
 
     def __init__(self, lock: object):

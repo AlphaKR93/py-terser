@@ -1,7 +1,7 @@
 import sys
 
-import terser._ast.ast as ast
-from terser._ast.annotation import get_parent
+import terser.ast_compat.ast as ast
+from terser.ast_compat.annotation import get_parent
 
 from terser._pipeline.transforms import RemoveAnnotationsOptions
 from terser._pipeline.transforms.suite_transformer import SuiteTransformer

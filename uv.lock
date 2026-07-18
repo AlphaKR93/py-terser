@@ -3,6 +3,18 @@ revision = 3
 requires-python = ">=3.14"
 
 [[package]]
+name = "aiostream"
+version = "0.7.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8b/65/b9b69695702b76a878c9879f2ee80cefce75bc5cb864fc100460bc1c5380/aiostream-0.7.1.tar.gz", hash = "sha256:272aaa0d8f83beb906f5aa9022bb59046bb7a103fa3770f807c31f918595acf6", size = 44059, upload-time = "2025-10-13T20:02:06.961Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/52/a0/d7c6ca304140f3f49987d710e15bc164248924a35d8cdfac2f6e87fca041/aiostream-0.7.1-py3-none-any.whl", hash = "sha256:ea8739e9158ee6a606b3feedf3762721c3507344e540d09a10984c5e88a13b37", size = 41416, upload-time = "2025-10-13T20:02:05.535Z" },
+]
+
+[[package]]
 name = "annotated-types"
 version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -46,6 +58,7 @@ name = "py-terser"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aiostream" },
     { name = "anyio" },
 ]
 
@@ -56,7 +69,10 @@ cli = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "anyio", specifier = ">=4.14.2" }]
+requires-dist = [
+    { name = "aiostream", specifier = ">=0.7.1" },
+    { name = "anyio", specifier = ">=4.14.2" },
+]
 
 [package.metadata.requires-dev]
 cli = [

@@ -1,4 +1,4 @@
-from terser._ast import ast
+from terser.ast_compat import ast
 from ..parser import is_scoped, ref
 
 from .name_generator import name_filter

@@ -1,8 +1,9 @@
 import builtins
+from typing import override
 
 from alpha93.commons import type_checker
 
-from terser._ast import NodeVisitor, ast
+from terser.ast_compat import NodeVisitor, ast
 from ...parser.ref import ModuleRef, ref
 from .binding import NameBinding
 from .util import arg_rename_in_place, scope_ref_global
@@ -17,14 +18,16 @@ class NameBinder(NodeVisitor):
 
     The NameBinding is added to the bindings dictionary in the namespace node the name is local to.
     """
+    module_ref: ModuleRef
 
     def __call__(self, module_ref: ModuleRef):
+        self.module_ref = module_ref
         return self.visit(module_ref._ast)
 
-    def get_binding(self, name: str, namespace: ContainsScope):
+    def __get_binding(self, name: str, namespace: ContainsScope):
         namespace_ref = ref(namespace)
         if name in namespace_ref.globals and not isinstance(namespace, ast.Module):
-            return self.get_binding(name, scope_ref_global(namespace)._ast)
+            return self.__get_binding(name, scope_ref_global(namespace)._ast)
 
         # nonlocal names should not create a binding in any context
         assert name not in namespace_ref.nonlocals
@@ -49,6 +52,7 @@ class NameBinder(NodeVisitor):
 
         return binding
 
+    @override
     def visit_Name(self, node: ast.Name):
         namespace = ref(node).namespace
         if node.id in ref(namespace).nonlocals:
@@ -57,10 +61,10 @@ class NameBinder(NodeVisitor):
             return
 
         if isinstance(node.ctx, (ast.Store, ast.Del)):
-            self.get_binding(node.id, namespace).add_reference(node)
+            self.__get_binding(node.id, namespace).add_reference(node)
 
         if isinstance(node.ctx, ast.Param):
-            binding = self.get_binding(node.id, namespace)
+            binding = self.__get_binding(node.id, namespace)
 
             if arg_rename_in_place(node):
                 binding.add_reference(node)
@@ -74,13 +78,13 @@ class NameBinder(NodeVisitor):
     def visit_ClassDef(self, node: ast.ClassDef):
         namespace = ref(node).namespace
         if node.name not in ref(namespace).nonlocals:
-            self.get_binding(node.name, namespace).add_reference(node)
+            self.__get_binding(node.name, namespace).add_reference(node)
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef):
         namespace = ref(node).namespace
         if node.name not in ref(namespace).nonlocals:
-            self.get_binding(node.name, namespace).add_reference(node)
+            self.__get_binding(node.name, namespace).add_reference(node)
         self.generic_visit(node)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
@@ -99,12 +103,12 @@ class NameBinder(NodeVisitor):
 
         if node.asname is not None:
             if node.asname not in ref(namespace).nonlocals:
-                self.get_binding(node.asname, namespace).add_reference(node)
+                self.__get_binding(node.asname, namespace).add_reference(node)
         else:
             # This binds the root module only for a dotted import
 
             if root_module not in ref(namespace).nonlocals:
-                binding = self.get_binding(root_module, namespace)
+                binding = self.__get_binding(root_module, namespace)
                 binding.add_reference(node)
 
                 if '.' in node.name:
@@ -115,11 +119,11 @@ class NameBinder(NodeVisitor):
 
         # varargs, kwarg can't be nonlocal
         if isinstance(node.vararg, str):
-            binding = self.get_binding(node.vararg, namespace)
+            binding = self.__get_binding(node.vararg, namespace)
             binding.add_reference(node)
 
         if isinstance(node.kwarg, str):
-            binding = self.get_binding(node.kwarg, namespace)
+            binding = self.__get_binding(node.kwarg, namespace)
             binding.add_reference(node)
 
         self.generic_visit(node)
@@ -128,7 +132,7 @@ class NameBinder(NodeVisitor):
         namespace = ref(node).namespace
 
         # Args can't be nonlocal
-        binding = self.get_binding(node.arg, namespace)
+        binding = self.__get_binding(node.arg, namespace)
 
         if arg_rename_in_place(node):
             binding.add_reference(node)
@@ -147,7 +151,7 @@ class NameBinder(NodeVisitor):
         if node.name is not None:
             if isinstance(node.name, str) and node.name not in ref(namespace).nonlocals:
                 # python 3
-                self.get_binding(node.name, namespace).add_reference(node)
+                self.__get_binding(node.name, namespace).add_reference(node)
             else:
                 # In python 2 the name is a Name node,
                 # which will be visited by generic_visit
@@ -157,47 +161,47 @@ class NameBinder(NodeVisitor):
 
     def visit_Global(self, node: ast.Global):
         for name in node.names:
-            self.get_binding(name, ref(node).namespace).add_reference(node)
+            self.__get_binding(name, ref(node).namespace).add_reference(node)
 
     def visit_MatchAs(self, node: ast.MatchAs):
         namespace = ref(node).namespace
         if node.name is not None and node.name not in ref(namespace).nonlocals:
-            self.get_binding(node.name, namespace).add_reference(node)
+            self.__get_binding(node.name, namespace).add_reference(node)
 
         self.generic_visit(node)
 
     def visit_MatchStar(self, node: ast.MatchStar):
         namespace = ref(node).namespace
         if node.name is not None and node.name not in ref(namespace).nonlocals:
-            self.get_binding(node.name, namespace).add_reference(node)
+            self.__get_binding(node.name, namespace).add_reference(node)
 
         self.generic_visit(node)
 
     def visit_MatchMapping(self, node: ast.MatchMapping):
         namespace = ref(node).namespace
         if node.rest is not None and node.rest not in ref(namespace).nonlocals:
-            self.get_binding(node.rest, namespace).add_reference(node)
+            self.__get_binding(node.rest, namespace).add_reference(node)
 
         self.generic_visit(node)
 
     def visit_TypeVar(self, node: ast.TypeVar):
         namespace = ref(node).namespace
         if node.name not in ref(namespace).nonlocals:
-            self.get_binding(node.name, namespace).add_reference(node)
+            self.__get_binding(node.name, namespace).add_reference(node)
 
         scope_ref_global(namespace).preserved.add(node.name)
 
     def visit_TypeVarTuple(self, node: ast.TypeVarTuple):
         namespace = ref(node).namespace
         if node.name not in ref(namespace).nonlocals:
-            self.get_binding(node.name, namespace).add_reference(node)
+            self.__get_binding(node.name, namespace).add_reference(node)
 
         scope_ref_global(namespace).preserved.add(node.name)
 
     def visit_ParamSpec(self, node: ast.ParamSpec):
         namespace = ref(node).namespace
         if node.name not in ref(namespace).nonlocals:
-            self.get_binding(node.name, namespace).add_reference(node)
+            self.__get_binding(node.name, namespace).add_reference(node)
 
         scope_ref_global(namespace).preserved.add(node.name)
 

@@ -1,5 +1,5 @@
-import terser._ast.ast as ast
-from terser._ast.annotation import get_parent, set_parent
+import terser.ast_compat.ast as ast
+from terser.ast_compat.annotation import get_parent, set_parent
 
 from terser._pipeline.mangler import Binding
 from terser._pipeline.mangler.util import insert

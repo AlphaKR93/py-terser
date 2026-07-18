@@ -45,16 +45,16 @@ def main():
             minified = do_minify(source, "<stdin>", args)
         except MinificationNotBeneficialError:
             # Use original source when minification isn't beneficial
-            if args.output:
-                with open(args.output, 'wb') as f:
+            if args.output_options.output:
+                with open(args.output_options.output, 'wb') as f:
                     f.write(source)
             else:
                 # Write original source to stdout
                 sys.stdout.buffer.write(source)
             return
 
-        if args.output:
-            with open(args.output, 'wb') as f:
+        if args.output_options.output:
+            with open(args.output_options.output, 'wb') as f:
                 f.write(minified)
         else:
             sys.stdout.buffer.write(minified)

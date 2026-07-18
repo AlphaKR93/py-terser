@@ -1,9 +1,5 @@
-import sys
-
-import terser._ast.ast as ast
-
-from terser._pipeline.printer.token_printer import Delimiter, TokenPrinter
-from terser.util import is_constant_node
+from ...ast_compat import ast, is_constant_node
+from .token_printer import Delimiter, TokenPrinter
 
 
 class ExpressionPrinter(object):

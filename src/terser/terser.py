@@ -1,19 +1,19 @@
-from ._ast import CompareError, ast, compare_ast
+from .ast_compat import CompareError, ast, compare_ast
 
 from .exceptions import InvalidTransformError
 from terser._pipeline.printer.module_printer import ModulePrinter
-from terser._pipeline.mangler import (
-    allow_rename_globals,
-    allow_rename_locals,
-    rename,
-    rename_literals,
-)
+# from terser._pipeline.mangler import (
+#     allow_rename_globals,
+#     allow_rename_locals,
+#     rename,
+#     rename_literals,
+# )
 
 from ._pipeline.linker import binder
-from terser._pipeline.parser import parser
+from ._pipeline.parser import parser
+from ._pipeline.preprocessor import preprocess
+from ._pipeline.transforms import __transforms__
 from .config import TransformConfig
-from terser._pipeline.preprocessor import preprocess
-from terser._pipeline.transforms import __transforms__
 
 
 def unparse(

@@ -2,7 +2,7 @@ import builtins
 
 from alpha93.commons import type_checker
 
-from terser._ast import ast
+from terser.ast_compat import ast
 from ...parser.ref import ref
 
 from .binding import BuiltinBinding, NameBinding

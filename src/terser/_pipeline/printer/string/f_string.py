@@ -10,10 +10,10 @@ import copy
 import re
 import sys
 
-import terser._ast.ast as ast
+import terser.ast_compat.ast as ast
 
 from terser import UnstableMinification
-from terser._ast.compare import CompareError, compare_ast
+from terser.ast_compat.compare import CompareError, compare_ast
 from terser._pipeline.printer.expression_printer import ExpressionPrinter
 from terser._pipeline.printer.string.ministring import MiniString
 from terser._pipeline.printer.token_printer import TokenTypes

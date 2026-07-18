@@ -1,7 +1,4 @@
-import sys
-
-import terser._ast.ast as ast
-
+from ...ast_compat import ast
 from .expression_printer import ExpressionPrinter
 from .token_printer import Delimiter
 

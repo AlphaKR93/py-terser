@@ -1,59 +1,28 @@
 from abc import ABC
-from typing import TYPE_CHECKING, override
+from enum import IntFlag, auto
+from typing import TYPE_CHECKING, ClassVar, final
 
-from terser._ast import ast
-from .._ast.annotation import get_parent, add_parent as add_node_parent
-
-from ..mangler.mapper import add_parent
+from terser.ast_compat import NodeVisitor, ast
+from ..parser._scope import ScopeResolver
+from ..parser import ref
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from ..parser.ref import ContainsScope
 
 
-class NodeVisitor(ast.NodeVisitor, ABC):
-    def __visitor(self, name: str) -> Callable[[ast.AST], ast.AST]:
-        return getattr(self, f"visit_{name}", self.generic_visit)
-
-    @override
-    def visit(self, node: ast.AST):
-        """Visit a node."""
-        return self.__visitor(node.__class__.__name__)(node)
-
-    @override
-    def generic_visit(self, node: ast.AST):
-        """Called if no explicit visitor function exists for a node."""
-        for _field, value in ast.iter_fields(node):
-            if isinstance(value, list):
-                for item in value:
-                    if isinstance(item, ast.AST):
-                        self.visit(item)
-            elif isinstance(value, ast.AST):
-                self.visit(value)
-
-    @override
-    def visit_Constant(self, node: ast.Constant):
-        name: str
-        if node.value in [None, True, False]:
-            name = "NameConstant"
-        elif isinstance(node.value, (int, float, complex)):
-            name = "Num"
-        elif isinstance(node.value, str):
-            name = "Str"
-        elif isinstance(node.value, bytes):
-            name = "Bytes"
-        elif node.value == Ellipsis:
-            name = "Ellipsis"
-        else:
-            raise RuntimeError(f"Unknown Constant value type {type(node.value)}")
-
-        return self.__visitor(name)(node)
+class TransformTags(IntFlag):
+    REQUIRES_IMPORT_RESOLVE = auto()
+    REQUIRES_MODULE_RESOLVE = auto()
+    INFLUENCES_MANGLING = auto()
 
 
 class SuiteTransformer(NodeVisitor, ABC):
     """
     Transform suites of instructions
     """
+    _TAGS: ClassVar[TransformTags]
 
+    @final
     def __call__(self, node):
         return self.visit(node)
 
@@ -88,7 +57,7 @@ class SuiteTransformer(NodeVisitor, ABC):
         return node
 
     def visit_AsyncFunctionDef(self, node):
-        return self.visit_FunctionDef(node)
+        return self.visit_FunctionDef(node) # type: ignore
 
     def visit_For(self, node):
         node.target = self.visit(node.target)
@@ -102,7 +71,7 @@ class SuiteTransformer(NodeVisitor, ABC):
         return node
 
     def visit_AsyncFor(self, node):
-        return self.visit_For(node)
+        return self.visit_For(node) # type: ignore
 
     def visit_If(self, node):
         node.test = self.visit(node.test)
@@ -151,7 +120,7 @@ class SuiteTransformer(NodeVisitor, ABC):
         return node
 
     def visit_AsyncWith(self, node):
-        return self.visit_With(node)
+        return self.visit_With(node)    # type: ignore
 
     def visit_Module(self, node):
         node.body = self.suite(node.body, parent=node)
@@ -182,26 +151,24 @@ class SuiteTransformer(NodeVisitor, ABC):
                     setattr(node, field, new_node)
         return node
 
-    def add_child(self, child, parent, namespace=None):
-        def nearest_function_namespace(node):
+    @final
+    def add_child(self, child, parent, namespace: ContainsScope | None = None):
+        def nearest_function_namespace(node: ast.AST) -> ContainsScope:
             """
             Return the namespace node for the nearest function scope.
 
             This could be itself.
 
             :param node: The node to get the function namespace of
-            :type node: ast.Node
-            :rtype: ast.Node
-
             """
 
             if isinstance(node, (ast.FunctionDef, ast.Module, ast.AsyncFunctionDef)):
                 return node
-            return nearest_function_namespace(get_parent(node))
+            return nearest_function_namespace(ref(node)._parent)
 
         if namespace is None:
             namespace = nearest_function_namespace(parent)
 
-        add_node_parent(child, parent=parent)
-        add_parent(child, namespace=namespace)
+        ref(child)._parent = parent
+        ScopeResolver.child(child, namespace=namespace)
         return child

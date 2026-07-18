@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import override
 
-from terser._ast import ast
+from terser.ast_compat import ast
 from .util import arg_rename_in_place, insert
 
 

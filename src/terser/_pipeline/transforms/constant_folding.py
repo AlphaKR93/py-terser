@@ -1,13 +1,10 @@
 import math
 import sys
 
-import terser._ast.ast as ast
-from terser._ast.annotation import get_parent
+from terser.ast_compat import ast, compare_ast, is_constant_node
 
-from terser._ast.compare import compare_ast
-from terser._pipeline.printer.expression_printer import ExpressionPrinter
-from terser._pipeline.transforms.suite_transformer import SuiteTransformer
-from terser.util import is_constant_node
+from ..printer.expression_printer import ExpressionPrinter
+from .suite_transformer import SuiteTransformer
 
 
 def is_foldable_constant(node):

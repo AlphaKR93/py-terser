@@ -233,6 +233,10 @@ class PathProvider(MutableSet[str]):
     def __iter__(self):
         pass
 
+    @property
+    def namespace(self):
+        return self.__namespaces
+
 
 class ProjectMinifier:
     def __init__(

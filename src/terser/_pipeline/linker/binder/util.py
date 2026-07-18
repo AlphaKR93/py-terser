@@ -1,5 +1,5 @@
 from alpha93.commons import type_checker
-from alpha93.commons.utils import typed
+from alpha93.commons.typing import typed
 
 from terser.ast_compat import ast, is_constant_node
 from ...parser.ref import ref, is_scoped

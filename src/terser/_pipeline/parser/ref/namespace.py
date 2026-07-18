@@ -68,6 +68,8 @@ class NamespacePackage(Namespace):
             raise ImportError(f"Could not resolve module: {module}")
         if module.startswith(".."):
             return module[2:]
+        if not module.startswith("."):
+            return module
         return str(self) + module
 
     @property
@@ -105,6 +107,8 @@ class Package(Namespace):
                 return module[2:]
 
             return self.__parent.resolve(module[1:])
+        if not module.startswith("."):
+            return module
         return str(self) + module
 
     @property

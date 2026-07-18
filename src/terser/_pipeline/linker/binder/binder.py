@@ -1,14 +1,13 @@
 import builtins
-from typing import override
-
-from alpha93.commons import type_checker
+from typing import TYPE_CHECKING, override
 
 from terser.ast_compat import NodeVisitor, ast
 from ...parser.ref import ModuleRef, ref
-from .binding import NameBinding
+from .binding import Binding, ImportBinding, NameBinding
 from .util import arg_rename_in_place, scope_ref_global
 
-if type_checker.TYPE_CHECKING:
+if TYPE_CHECKING:
+    from collections.abc import Callable
     from ...parser.ref import ContainsScope
 
 
@@ -24,10 +23,10 @@ class NameBinder(NodeVisitor):
         self.module_ref = module_ref
         return self.visit(module_ref._ast)
 
-    def __get_binding(self, name: str, namespace: ContainsScope):
+    def __get_binding(self, name: str, namespace: ContainsScope, factory: Callable[[str], Binding] = NameBinding):
         namespace_ref = ref(namespace)
         if name in namespace_ref.globals and not isinstance(namespace, ast.Module):
-            return self.__get_binding(name, scope_ref_global(namespace)._ast)
+            return self.__get_binding(name, scope_ref_global(namespace)._ast, factory=factory)
 
         # nonlocal names should not create a binding in any context
         assert name not in namespace_ref.nonlocals
@@ -36,7 +35,7 @@ class NameBinder(NodeVisitor):
             if binding.name == name:
                 break
         else:  # weeee!
-            binding = NameBinding(name)
+            binding = factory(name)
             namespace_ref.bindings.append(binding)
 
             if name in dir(builtins):
@@ -92,7 +91,12 @@ class NameBinder(NodeVisitor):
 
     def visit_alias(self, node: ast.alias):
         if node.name == '*':
-            scope_ref_global(node).tainted = True
+            # Deferred: the bound names depend on the target module's exports,
+            # which are only known once every module in the project has been bound.
+            from_node = ref(node)._parent
+            assert isinstance(from_node, ast.ImportFrom)
+            self.module_ref.wildcard_imports.append(from_node)
+            return
 
         root_module = node.name.split('.')[0]
 
@@ -101,15 +105,21 @@ class NameBinder(NodeVisitor):
 
         namespace = ref(node).namespace
 
+        factory = lambda name: ImportBinding(name, node)
         if node.asname is not None:
             if node.asname not in ref(namespace).nonlocals:
-                self.__get_binding(node.asname, namespace).add_reference(node)
+                binding = self.__get_binding(node.asname, namespace, factory)
+                binding.add_reference(node)
+                if isinstance(binding, ImportBinding):
+                    self.module_ref.import_bindings.add(binding)
         else:
             # This binds the root module only for a dotted import
 
             if root_module not in ref(namespace).nonlocals:
-                binding = self.__get_binding(root_module, namespace)
+                binding = self.__get_binding(root_module, namespace, factory)
                 binding.add_reference(node)
+                if isinstance(binding, ImportBinding):
+                    self.module_ref.import_bindings.add(binding)
 
                 if '.' in node.name:
                     binding.disallow_rename()

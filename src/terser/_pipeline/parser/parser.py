@@ -8,8 +8,8 @@ if type_checker.TYPE_CHECKING:
     from typing import Any
 
 
-def parse(source: str, path: str, *args, **kwargs):
+def parse(source: str, namespace, path: str, *args, **kwargs):
     module: Any = ast.parse(source, path or "<unknown>", *args, **kwargs)
-    module_ref = ModuleRef(module)
+    module_ref = ModuleRef(module, namespace)
     ScopeResolver.module(module_ref)
     return module, module_ref

@@ -1,4 +1,9 @@
+from typing import TYPE_CHECKING
+
 from . import ast
+
+if TYPE_CHECKING:
+    from typing import Any
 
 
 class CompareError(RuntimeError):
@@ -31,8 +36,8 @@ class CompareError(RuntimeError):
         if self.msg:
             error += self.msg
 
-        if self.namespace(self.lnode):
-            error += ' in namespace ' + self.namespace(self.lnode)
+        if namespace := self.namespace(self.lnode):
+            error += ' in namespace ' + namespace
 
         if self.lnode and hasattr(self.lnode, 'lineno'):
             error += ' at source %i:%i' % (self.lnode.lineno, self.lnode.col_offset)
@@ -40,7 +45,8 @@ class CompareError(RuntimeError):
         return error
 
 
-def compare_ast(l_ast, r_ast):
+# noinspection string-conversion-without-dunder-method
+def compare_ast(l_ast: Any, r_ast: Any, /):
     """
     Compare Python Abstract Syntax Trees
 
@@ -50,14 +56,16 @@ def compare_ast(l_ast, r_ast):
 
     """
 
+    if not isinstance(r_ast, type(l_ast)):
+        raise CompareError(l_ast, r_ast, msg='Nodes do not match! %r != %r' % (l_ast, r_ast))
+    assert isinstance(l_ast, ast.AST) and isinstance(r_ast, ast.AST)
+
+    # noinspection shadowing-names
     def counter():
         i = 0
         while True:
             yield i
             i += 1
-
-    if type(l_ast) != type(r_ast):
-        raise CompareError(l_ast, r_ast, msg='Nodes do not match! %r != %r' % (l_ast, r_ast))
 
     for field in sorted(set(l_ast._fields + r_ast._fields)):
 
@@ -67,39 +75,38 @@ def compare_ast(l_ast, r_ast):
         if field == 'str' and hasattr(ast, 'Interpolation') and isinstance(l_ast, ast.Interpolation):
             continue
 
-        if isinstance(getattr(l_ast, field, None), list):
+        l_field = getattr(l_ast, field, None)
+        r_field = getattr(r_ast, field, None)
 
-            l_list = getattr(l_ast, field, None)
-            r_list = getattr(r_ast, field, None)
-
-            if len(l_list) != len(r_list):
-                raise CompareError(
-                    l_list,
-                    r_list,
-                    'List does not have the same number of elements! len(%s.%s)=%r, len(%s.%s)=%r'
-                    % (type(l_ast), field, len(l_list), type(r_ast), field, len(r_list)),
-                )
-
-            for i, left, right in zip(counter(), l_list, r_list):
-                if isinstance(left, ast.AST) or isinstance(right, ast.AST):
-                    compare_ast(left, right)
-                elif left != right:
-                    raise CompareError(
-                        l_ast,
-                        r_ast,
-                        'Fields do not match! %s.%s[%i]=%r, %s.%s[%i]=%r'
-                        % (type(l_ast), field, i, left, type(r_ast), field, i, right),
-                    )
-
-        else:
-            left_field = getattr(l_ast, field, None)
-            right_field = getattr(r_ast, field, None)
-
-            if isinstance(left_field, ast.AST) or isinstance(right_field, ast.AST):
-                compare_ast(left_field, right_field)
-            elif left_field != right_field:
+        if not isinstance(l_field, list):
+            if isinstance(l_field, ast.AST) or isinstance(r_field, ast.AST):
+                compare_ast(l_field, r_field)
+            elif l_field != r_field:
                 raise CompareError(
                     l_ast,
                     r_ast,
-                    'Fields do not match! %s.%s=%r, %s.%s=%r' % (type(l_ast), field, left_field, type(r_ast), field, right_field),
+                    f"Fields do not match: {type(l_ast)}.{field}={l_field}, {type(r_ast)}.{field}={r_field}"
+                )
+
+            continue
+
+        assert isinstance(r_field, list)
+
+        if len(l_field) != len(r_field):
+            raise CompareError(
+                l_field,
+                r_field,
+                "List does not have the same number of elements:"
+                f" len({type(l_ast)}.{field})={len(l_field)},"
+                f" len({type(r_ast)}.{field})={len(r_field)}"
+            )
+
+        for i, left, right in zip(counter(), l_field, r_field):
+            if isinstance(left, ast.AST) or isinstance(right, ast.AST):
+                compare_ast(left, right)
+            elif left != right:
+                raise CompareError(
+                    l_ast,
+                    r_ast,
+                    f"Fields do not match: {type(l_ast)}.{field}[{i}]={left}, {type(r_ast)}.{field}[{i}]={right}"
                 )

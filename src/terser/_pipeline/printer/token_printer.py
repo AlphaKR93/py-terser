@@ -1,10 +1,9 @@
 """Tools for assembling python code from tokens."""
+from enum import IntEnum
+from re import compile as _re
 
-import re
-import sys
 
-
-class TokenTypes:
+class TokenTypes(IntEnum):
     NoToken = 0
     Identifier = 1
     Keyword = 2
@@ -81,6 +80,7 @@ class TokenPrinter:
     """
     Concatenates terminal symbols of the python grammar
     """
+    __FLOAT = _re(r"^(\d+?)(0+).0$")
 
     def __init__(self, prefer_single_line=False, allow_invalid_num_warnings=False):
         """
@@ -91,11 +91,7 @@ class TokenPrinter:
         self._prefer_single_line = prefer_single_line
         self._allow_invalid_num_warnings = allow_invalid_num_warnings
 
-        # Initialize as unicode string on Python 2.7 to handle Unicode content
-        if sys.version_info[0] < 3:
-            self._code = u''
-        else:
-            self._code = ''
+        self._code = ''
         self.indent = 0
         self.unicode_literals = False
         self.previous_token = TokenTypes.NoToken
@@ -146,14 +142,6 @@ class TokenPrinter:
     def stringliteral(self, value):
         """Add a string literal to the output code."""
         s = repr(value)
-
-        if sys.version_info < (3, 0) and self.unicode_literals:
-            if s[0] == 'u':
-                # Remove the u prefix since literals are unicode by default
-                s = s[1:]
-            else:
-                # Add a b prefix to indicate it is NOT unicode
-                s = 'b' + s
 
         if len(s) > 0 and s[0].isalpha() and self.previous_token in [TokenTypes.Identifier, TokenTypes.Keyword, TokenTypes.SoftKeyword]:
             self.delimiter(' ')
@@ -258,7 +246,7 @@ class TokenPrinter:
 
         s = s.replace('e+', 'e')
 
-        add_e = re.match(r'^(\d+?)(0+).0$', s)
+        add_e = self.__FLOAT.match(s)
         if add_e:
             s = add_e.group(1) + 'e' + str(len(add_e.group(2)))
 

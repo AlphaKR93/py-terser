@@ -2,13 +2,13 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, override
 
 from terser.ast_compat import ast
-from ...parser import ref
+from ..parser import ref
 from .util import arg_rename_in_place, insert
 
 if TYPE_CHECKING:
     from typing import Any
 
-    from ...parser.ref import ModuleRef
+    from ..parser.ref import ModuleRef
 
 
 class Binding(ABC):

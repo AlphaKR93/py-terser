@@ -35,7 +35,7 @@ class RemoveLiteralStatements(SuiteTransformer):
 
     def visit_Module(self, node):
         for binding in node.bindings:
-            if binding.name == '__doc__':
+            if binding.spec == '__doc__':
                 node.body = [self.visit(a) for a in node.body]
                 return node
 

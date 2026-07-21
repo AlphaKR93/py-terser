@@ -1,4 +1,5 @@
 from alpha93.commons import typed
+
 from ...ast_compat import ast
 from .expression_printer import ExpressionPrinter
 from .token_printer import Delimiter

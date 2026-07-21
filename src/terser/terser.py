@@ -93,8 +93,8 @@ def minify(
         module = transform(config)(module)
 
 
-    binder.bind(module)
     binder.resolve(module)
+    binder.bind(module)
 
 
     if config.remove_empty_exc_brackets and not module_ref.tainted:

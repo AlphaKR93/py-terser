@@ -6,7 +6,7 @@ from ._node import NodeRef
 if TYPE_CHECKING:
     from typing import Final, TypeGuard
 
-    from terser._pipeline.linker.binder.binding import Binding
+    from ...resolver.binding import Binding
     from ._node import ContainsScope
 
 

@@ -1,14 +1,14 @@
+from .ref import ModuleSpec
 from ast import Module
-from os import PathLike
-from typing import Any, Literal
+from typing import Literal
 
-from terser._pipeline.parser.ref import ModuleRef
+from .ref import ModuleRef
 
 
 def parse(
     source: str,
-    path: str | PathLike[Any] | Literal["<stdin>"] | None = None,
-    mode: Literal["exec", "eval", "func_type"] = "exec",
+    spec: ModuleSpec | str,
+    mode: Literal["exec"] = "exec",
     *,
     type_comments: bool = False,
     feature_version: int | tuple[int, int] | None = None,

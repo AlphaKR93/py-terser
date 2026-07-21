@@ -4,9 +4,10 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+    from typing import Final
 
 
-__DIRECTIVES = {
+__DIRECTIVES: Final[Mapping[str, Mapping[bool, re.Pattern]]] = {
     "if": {
         True: re.compile(r"^#\s?if ([A-Za-z_][A-Za-z0-9_]*)$"),
         False: re.compile(r"^#\s*if\s+([A-Za-z_][A-Za-z0-9_]*)$")
@@ -25,7 +26,7 @@ __DIRECTIVES = {
     },
 }
 
-__INLINE_DIRECTIVE: Mapping[bool, re.Pattern] = {
+__INLINE_DIRECTIVE: Final[Mapping[bool, re.Pattern]] = {
     True: re.compile(r"\s*#\s?if ([A-Za-z_][A-Za-z0-9_]*)$"),
     False: re.compile(r"\s*#\s*if\s+([A-Za-z_][A-Za-z0-9_]*)$")
 }

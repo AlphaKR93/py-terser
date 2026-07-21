@@ -1,11 +1,13 @@
 from typing import TYPE_CHECKING, final
 
 from terser.ast_compat import ast
-from ._scoped import ScopedNode
+from .._scoped import ScopedNode
 
 if TYPE_CHECKING:
-    from .namespace import Namespace
-    from terser._pipeline.linker.binder.binding import ImportBinding, UnresolvedModuleRef
+    from typing import Final
+
+    from ._spec import ModuleSpec
+    from ....resolver.binding import ImportBinding, UnresolvedModuleRef
 
 
 @final
@@ -16,25 +18,27 @@ class _Root(ast.AST):
 
 @final
 class ModuleRef(ScopedNode[ast.Module]):
-    tainted: bool
+    spec: Final[ModuleSpec]
     preserved: set[str]
+    all: set[str] | None
 
-    import_targets: dict[ImportBinding, UnresolvedModuleRef | None]
+    import_targets: dict[ImportBinding, UnresolvedModuleRef]
     """Every ImportBinding created while binding this module, mapped to its resolved path once
     `resolve_imports` has run (None until then)"""
 
-    wildcard_targets: dict[ast.ImportFrom, UnresolvedModuleRef | None]
+    wildcard_targets: dict[ast.ImportFrom, UnresolvedModuleRef]
     """Every `from x import *` statement in this module, mapped to its resolved path once
     `resolve_imports` has run (None until then)"""
 
-    name: Namespace
+    tainted: bool
 
-    def __init__(self, module: ast.Module, name: Namespace):
-        self.tainted = False
+    def __init__(self, module: ast.Module, spec: ModuleSpec):
+        self.spec = spec
         self.preserved = set()
+        self.all = None
         self.import_targets = {}
         self.wildcard_targets = {}
-        self.name = name
+        self.tainted = False
 
         super().__init__(module, None)  # type: ignore[ty:invalid-argument-type]
         self._resolve_all()

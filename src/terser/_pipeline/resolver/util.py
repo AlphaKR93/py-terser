@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING
 from alpha93.commons import typed
 
 from terser.ast_compat import ast, is_constant_node
-from ...parser import ref, is_scoped
+from ..parser import ref, is_scoped
 
 if TYPE_CHECKING:
-    from ...parser.ref import Invokable, ModuleRef, ScopedNode
+    from ..parser.ref import Invokable, ModuleRef, ScopedNode
 
 
 def scope_ref_global(node: ast.AST) -> ModuleRef:
@@ -125,3 +125,29 @@ def allow_rename_locals(node, rename_locals: bool, preserve_locals: list[str] | 
 
     for child in ast.iter_child_nodes(node):
         allow_rename_locals(child, rename_locals, preserve_locals)
+
+
+def find_all(module_ref: ModuleRef) -> list[str] | None:
+    """
+    The names listed in `module_ref`'s `__all__`, or None if it has no statically resolvable
+    `__all__` (either absent, or built dynamically)
+    """
+
+    for stmt in module_ref._ast.body:
+        if not isinstance(stmt, ast.Assign):
+            continue
+        if len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Name):
+            continue
+        if stmt.targets[0].id != '__all__':
+            continue
+        if not isinstance(stmt.value, (ast.List, ast.Tuple)):
+            return None
+
+        names = []
+        for elt in stmt.value.elts:
+            if not (isinstance(elt, ast.Constant) and isinstance(elt.value, str)):
+                return None
+            names.append(elt.value)
+        return names
+
+    return None

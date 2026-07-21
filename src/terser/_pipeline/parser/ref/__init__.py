@@ -1,9 +1,9 @@
+from typing import TYPE_CHECKING
+
 from ._scoped import SCOPED_T, ScopedNode, is_scoped
 from ._node import ref
-from .module import ModuleRef
+from ._module import ModuleSpec, ModuleRef, _spec as spec
 
-
-from alpha93.commons.type_checker import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ._node import Comprehension, Invokable, ContainsScope
@@ -11,8 +11,10 @@ if TYPE_CHECKING:
 
 __all__ = (
     "SCOPED_T",
+    "ModuleSpec",
     "ModuleRef",
     "ScopedNode",
+    "spec",
     "is_scoped",
     "ref",
 

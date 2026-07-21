@@ -11,17 +11,14 @@ This implementation is much simpler than f_string.py because:
 - Always use all quote types
 """
 
-import terser.ast_compat.ast as ast
-
-from terser import UnstableMinification
-from terser.ast_compat.compare import CompareError, compare_ast
-from terser._pipeline.printer.expression_printer import ExpressionPrinter
-from terser._pipeline.printer.string.ministring import MiniString
-from terser._pipeline.printer.token_printer import TokenTypes
-from terser.util import is_constant_node
+from terser.ast_compat import CompareError, ast, compare_ast, is_constant_node
+from terser.exceptions import InvalidTransformError
+from ..expression_printer import ExpressionPrinter
+from ..token_printer import TokenTypes
+from .ministring import MiniString
 
 
-class TString(object):
+class TString:
     """
     A Template String (t-string)
 
@@ -168,12 +165,12 @@ class TString(object):
             try:
                 minified_t_string = ast.parse(candidate, 'terser.t_string output', mode='eval').body
             except SyntaxError as syntax_error:
-                raise UnstableMinification(syntax_error, '', candidate)
+                raise InvalidTransformError(syntax_error, "<unknown>", None, candidate)
 
             try:
                 compare_ast(self.node, minified_t_string)
             except CompareError as compare_error:
-                raise UnstableMinification(compare_error, '', candidate)
+                raise InvalidTransformError(compare_error, "<unknown>", None, candidate)
 
         if not candidates:
             raise ValueError('Unable to create representation for t-string')

@@ -1,7 +1,7 @@
 BACKSLASH = '\\'
 
 
-class MiniString(object):
+class MiniString:
     """
     Create a representation of a string object
 
@@ -112,7 +112,7 @@ class MiniString(object):
         return s
 
 
-class MiniBytes(object):
+class MiniBytes:
     """
     Create a representation of a bytes object
 

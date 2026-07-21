@@ -1,29 +1,28 @@
 import builtins
-
-from alpha93.commons import type_checker
+from typing import TYPE_CHECKING
 
 from terser.ast_compat import ast
-from ...parser.ref import ref
+from ...parser.ref import ModuleRef, ref
 
 from .binding import BuiltinBinding, NameBinding
 from .util import scope_ref_global, scope_ref_nonlocal
 
-if type_checker.TYPE_CHECKING:
+if TYPE_CHECKING:
     from ...parser.ref import ScopedNode
     from .binding import Binding
 
 
 def get_binding(name: str, namespace_ref: ScopedNode) -> Binding:
-    if name in namespace_ref.globals and not isinstance(namespace_ref._ast, ast.Module):
+    if name in namespace_ref.globals and not isinstance(namespace_ref, ModuleRef):
         return get_binding(name, scope_ref_global(namespace_ref._ast))
-    elif name in namespace_ref.nonlocals and not isinstance(namespace_ref._ast, ast.Module):
+    elif name in namespace_ref.nonlocals and not isinstance(namespace_ref, ModuleRef):
         return get_binding(name, scope_ref_nonlocal(namespace_ref._ast))
 
     for binding in namespace_ref.bindings:
         if binding.name == name:
             return binding
 
-    if not isinstance(namespace_ref._ast, ast.Module):
+    if not isinstance(namespace_ref, ModuleRef):
         return get_binding(name, scope_ref_nonlocal(namespace_ref._ast))
 
     else:

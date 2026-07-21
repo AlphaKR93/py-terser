@@ -36,7 +36,7 @@ class ModuleRef(ScopedNode[ast.Module]):
         self.wildcard_targets = {}
         self.name = name
 
-        super().__init__(module, None)  # type: ignore[invalid-type]
+        super().__init__(module, None)  # type: ignore[ty:invalid-argument-type]
         self._resolve_all()
 
     @property

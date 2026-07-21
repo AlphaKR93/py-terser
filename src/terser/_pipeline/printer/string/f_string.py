@@ -10,27 +10,27 @@ import copy
 import re
 import sys
 
-import terser.ast_compat.ast as ast
-
-from terser import UnstableMinification
-from terser.ast_compat.compare import CompareError, compare_ast
-from terser._pipeline.printer.expression_printer import ExpressionPrinter
-from terser._pipeline.printer.string.ministring import MiniString
-from terser._pipeline.printer.token_printer import TokenTypes
-from terser.util import is_constant_node
+from terser.ast_compat import CompareError, ast, compare_ast, is_constant_node
+from terser.exceptions import InvalidTransformError
+from ..expression_printer import ExpressionPrinter
+from ..token_printer import TokenTypes
+from .ministring import MiniString
 
 
-class FString(object):
+_CONTROL = r"\x{:02x}"
+
+
+class FString:
     """
     An F-string in the expression part of another f-string
     """
 
-    def __init__(self, node, allowed_quotes, pep701):
+    def __init__(self, node: ast.JoinedStr, allowed_quotes: list[str], pep701: bool):
         assert isinstance(node, ast.JoinedStr)
 
-        self.node = node
-        self.allowed_quotes = allowed_quotes
-        self.pep701 = pep701
+        self.node: ast.JoinedStr = node
+        self.allowed_quotes: list[str] = allowed_quotes
+        self.pep701: bool = pep701
 
     def is_correct_ast(self, code):
         try:
@@ -157,7 +157,7 @@ class FString(object):
                 escaped += '}}'
             elif ord(c) < 32 and c not in '\n\r\t':
                 # Escape other control characters
-                escaped += '\\x{:02x}'.format(ord(c))
+                escaped += _CONTROL.format(ord(c))
             else:
                 escaped += c
         return escaped
@@ -186,12 +186,12 @@ class OuterFString(FString):
             try:
                 minified_f_string = ast.parse(candidate, 'terser.f_string output', mode='eval').body
             except SyntaxError as syntax_error:
-                raise UnstableMinification(syntax_error, '', candidate)
+                raise InvalidTransformError(syntax_error, "<unknown>", None, candidate)
 
             try:
                 compare_ast(self.node, minified_f_string)
             except CompareError as compare_error:
-                raise UnstableMinification(compare_error, '', candidate)
+                raise InvalidTransformError(compare_error, "<unknown>", None, candidate)
 
         if not candidates:
             raise ValueError('Unable to create representation for f-string')
@@ -292,7 +292,7 @@ class FormattedValue(ExpressionPrinter):
         self.candidates = [x + y for x in self.candidates for y in candidates]
 
 
-class Str(object):
+class Str:
     """
     A Str node inside an f-string expression
 
@@ -300,13 +300,13 @@ class Str(object):
 
     """
 
-    def __init__(self, s, allowed_quotes, pep701=False):
-        self._s = s
-        self.allowed_quotes = allowed_quotes
-        self.current_quote = None
-        self.pep701 = pep701
+    def __init__(self, s: str, allowed_quotes: list[str], pep701: bool = False):
+        self._s: str = s
+        self.allowed_quotes: list[str] = allowed_quotes
+        self.current_quote: str | None = None
+        self.pep701: bool = pep701
 
-    def _can_quote(self, c):
+    def _can_quote(self, c: str):
         if self.current_quote is None:
             return False
 
@@ -318,7 +318,7 @@ class Str(object):
 
         return True
 
-    def _get_quote(self, c):
+    def _get_quote(self, c) -> str:
         for quote in self.allowed_quotes:
             if not self.pep701 and (c == '\n' or c == '\r'):
                 if len(quote) == 3:
@@ -333,11 +333,13 @@ class Str(object):
         for c in self._s:
             if not self._can_quote(c):
                 if literal:
+                    assert self.current_quote is not None
                     literal += self.current_quote
                     yield literal
                     literal = ''
 
                 self.current_quote = self._get_quote(c)
+            assert self.current_quote is not None
 
             if literal == '':
                 literal += self.current_quote
@@ -354,6 +356,7 @@ class Str(object):
                 literal += c
 
         if literal:
+            assert self.current_quote is not None
             literal += self.current_quote
             yield literal
 
@@ -388,7 +391,7 @@ class Str(object):
             raise ValueError('Unable to string')
 
 
-class FormatSpec(object):
+class FormatSpec:
     """
     A FormattedValue format spec
 
@@ -444,13 +447,13 @@ class FormatSpec(object):
                 escaped += '\\r'
             elif ord(c) < 32 and c not in '\t\n':
                 # Escape other control characters except tab, newline
-                escaped += '\\x{:02x}'.format(ord(c))
+                escaped += _CONTROL.format(ord(c))
             else:
                 escaped += c
         return escaped
 
 
-class Bytes(object):
+class Bytes:
     """
     A Bytes node inside an f-string expression
 
@@ -458,10 +461,10 @@ class Bytes(object):
 
     """
 
-    def __init__(self, b, allowed_quotes):
-        self._b = b
-        self.allowed_quotes = allowed_quotes
-        self.current_quote = None
+    def __init__(self, b: bytes, allowed_quotes: list[str]):
+        self._b: bytes = b
+        self.allowed_quotes: list[str] = allowed_quotes
+        self.current_quote: str | None = None
 
     def _can_quote(self, c):
         if self.current_quote is None:
@@ -475,7 +478,7 @@ class Bytes(object):
 
         return True
 
-    def _get_quote(self, c):
+    def _get_quote(self, c) -> str:
         for quote in self.allowed_quotes:
             if c == ord(b'\n') or c == ord(b'\r'):
                 if len(quote) == 3:
@@ -490,11 +493,13 @@ class Bytes(object):
         for b in self._b:
             if not self._can_quote(b):
                 if literal:
+                    assert self.current_quote is not None
                     literal += self.current_quote
                     yield literal
                     literal = ''
 
                 self.current_quote = self._get_quote(b)
+            assert self.current_quote is not None
 
             if literal == '':
                 literal = 'b' + self.current_quote
@@ -515,9 +520,10 @@ class Bytes(object):
             elif 32 <= b <= 126:  # printable ASCII
                 literal += chr(b)
             else:  # other non-printable characters
-                literal += '\\x{:02x}'.format(b)
+                literal += _CONTROL.format(b)
 
         if literal:
+            assert self.current_quote is not None
             literal += self.current_quote
             yield literal
 

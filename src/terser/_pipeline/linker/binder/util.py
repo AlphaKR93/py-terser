@@ -1,10 +1,11 @@
-from alpha93.commons import type_checker
-from alpha93.commons.typing import typed
+from typing import TYPE_CHECKING
+
+from alpha93.commons import typed
 
 from terser.ast_compat import ast, is_constant_node
-from ...parser.ref import ref, is_scoped
+from ...parser import ref, is_scoped
 
-if type_checker.TYPE_CHECKING:
+if TYPE_CHECKING:
     from ...parser.ref import Invokable, ModuleRef, ScopedNode
 
 
@@ -51,7 +52,7 @@ def arg_rename_in_place(node: ast.AST, /) -> bool:
 
     :param node: The argument node
     """
-    func: Invokable = ref(node).namespace   # type: ignore[invalid-type]
+    func: Invokable = ref(node).namespace   # type: ignore[ty:invalid-assignment]
 
     if isinstance(func, ast.comprehension):
         return True

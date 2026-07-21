@@ -1,10 +1,10 @@
-from alpha93.commons import type_checker
+from typing import TYPE_CHECKING
 
 from terser.ast_compat import ast
 from ._scope import ScopeResolver
 from .ref import ModuleRef
 
-if type_checker.TYPE_CHECKING:
+if TYPE_CHECKING:
     from typing import Any
 
 

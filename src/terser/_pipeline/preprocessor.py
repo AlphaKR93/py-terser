@@ -1,8 +1,8 @@
 import re
-from alpha93.commons import type_checker
+from typing import TYPE_CHECKING
 
 
-if type_checker.TYPE_CHECKING:
+if TYPE_CHECKING:
     from collections.abc import Mapping
 
 
@@ -36,8 +36,7 @@ def preprocess(source: str, defines: Mapping[str, bool] | None, strict: bool = F
         return "", None
 
     shebang = lines.pop(0) if lines[0].startswith("#!") else None
-    if not defines:
-        return source, None
+    defines: Mapping[str, bool] = defines or {}
 
     # Directive evaluation
     output = []
@@ -50,30 +49,27 @@ def preprocess(source: str, defines: Mapping[str, bool] | None, strict: bool = F
         if not stripped.startswith('#'):
             if not (match := __INLINE_DIRECTIVE[strict].search(stripped)):
                 output.append(line)
-            elif keeping() and defines.get(match.group(1), True):
+            elif defines.get(match.group(1), True) and keeping():
                 output.append(line[:match.start()])
             continue
 
         # Check block directives
         if match := __DIRECTIVES["if"][strict].match(stripped):
-            defined = defines.get(match.group(1), True)
-            parent = all(state[0] for state in stack)
-            stack.append((bool(defined) and parent, defined))
+            defined: bool = defines.get(match.group(1), True)
+            stack.append((defined and keeping(), defined))
         elif match := __DIRECTIVES["elif"][strict].match(stripped):
             if not stack:
                 continue
 
-            defined = defines.get(match.group(1), True)
-            parent = all(state[0] for state in stack[:-1])
-            _, chosen = stack.pop()
-            stack.append((parent and not chosen and bool(defined), defined))
+            defined: bool = defines.get(match.group(1), True)
+            _, before = stack.pop()
+            stack.append((defined and not before and keeping(), defined))
         elif __DIRECTIVES["else"][strict].match(stripped):
             if not stack:
                 continue
 
-            parent = all(state[0] for state in stack[:-1])
-            _, chosen = stack.pop()
-            stack.append((parent and not chosen, True))
+            _, before = stack.pop()
+            stack.append((not before and keeping(), True))
         elif __DIRECTIVES["endif"][strict].match(stripped):
             if stack:
                 stack.pop()

@@ -2,7 +2,7 @@ from ...ast_compat import ast, is_constant_node
 from .token_printer import Delimiter, TokenPrinter
 
 
-class ExpressionPrinter(object):
+class ExpressionPrinter:
     """
     Builds the smallest possible exact representation of an ast
     """
@@ -62,12 +62,6 @@ class ExpressionPrinter(object):
             return self.precedences[node.op.__class__.__name__]
         elif isinstance(node, ast.Compare):
             return min(self.precedences[n.__class__.__name__] for n in node.ops)
-
-        # Python2 parses negative ints as an ast.Num with a negative value.
-        # Make sure the Num get the precedence of the USub operator in this case.
-        if sys.version_info < (3, 0) and is_constant_node(node, ast.Num):
-            if str(node.n)[0] == '-':
-                return self.precedences['USub']
 
         return self.precedences.get(node.__class__.__name__, 0)
 
@@ -203,16 +197,6 @@ class ExpressionPrinter(object):
 
     def visit_UnaryOp(self, node):
         self.visit(node.op)
-
-        if sys.version_info < (3, 0) and isinstance(node.op, ast.USub) and is_constant_node(node.operand, ast.Num):
-            # For: -(1), which is parsed as a UnaryOp(USub, Num(1)).
-            # Without this special case it would be printed as -1
-            # This is fine, but python 2 will then parse it at Num(-1) so the AST wouldn't round-trip.
-
-            self.printer.delimiter('(')
-            self.visit_Num(node.operand)
-            self.printer.delimiter(')')
-            return
 
         right_precedence = self.precedence(node.operand)
         op_precedence = self.precedence(node)
@@ -460,12 +444,10 @@ class ExpressionPrinter(object):
             self.visit_ExtSlice(node.slice)
         elif is_constant_node(node.slice, ast.Ellipsis):
             self.visit_Ellipsis(node)
-        elif sys.version_info >= (3, 9) and isinstance(node.slice, ast.Tuple):
+        elif isinstance(node.slice, ast.Tuple):
             self.visit_Tuple(node.slice)
-        elif sys.version_info >= (3, 9):
-            self._expression(node.slice)
         else:
-            raise AssertionError('Unknown slice type %r' % node.slice)
+            self._expression(node.slice)
 
         self.printer.delimiter(']')
 
@@ -732,11 +714,7 @@ class ExpressionPrinter(object):
 
         import terser._pipeline.printer.string.f_string
 
-        if sys.version_info < (3, 12):
-            pep701 = False
-        else:
-            pep701 = True
-
+        pep701 = __import__("sys").version_info >= (3, 12)
         self.printer.fstring(str(terser._pipeline.printer.string.f_string.OuterFString(node, pep701=pep701)))
 
     def visit_TemplateStr(self, node):

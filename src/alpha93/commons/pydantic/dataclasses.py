@@ -1,15 +1,16 @@
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, ConfigDict, create_model, dataclasses
 
-from alpha93.commons import type_checker
-
-if type_checker.TYPE_CHECKING:
+if TYPE_CHECKING:
+    from typing import Any
     from _typeshed import DataclassInstance
 
 
 __PRESERVE_DOCSTRINGS = ConfigDict(use_attribute_docstrings=True)
 
 def to_model(dataclass: type[DataclassInstance]) -> type[BaseModel]:
-    _pydantic = dataclasses.dataclass(dataclass, config=__PRESERVE_DOCSTRINGS)
+    _pydantic: Any = dataclasses.dataclass(dataclass, config=__PRESERVE_DOCSTRINGS)
     return create_model(
         _pydantic.__name__,
         __base__=BaseModel,

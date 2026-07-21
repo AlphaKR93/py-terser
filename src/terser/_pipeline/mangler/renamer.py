@@ -94,7 +94,7 @@ def reserve_name(name, reservation_scope):
         namespace.assigned_names.add(name)
 
 
-class UniqueNameAssigner(object):
+class UniqueNameAssigner:
     """
     Assign new names to renamed bindings
 
@@ -118,7 +118,7 @@ class UniqueNameAssigner(object):
         return module
 
 
-class NameAssigner(object):
+class NameAssigner:
     """
     Assign new names to renamed bindings
 

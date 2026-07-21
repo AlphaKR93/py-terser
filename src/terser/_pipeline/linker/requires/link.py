@@ -79,12 +79,12 @@ def mark_exports(module_ref: ModuleRef) -> None:
 
     all_ = _module_all(module_ref)
     exported_names = set(all_) if all_ is not None else {
-        binding.name for binding in module_ref.bindings if not binding.name.startswith('__')
+        name for binding in module_ref.bindings if not (name := binding.name) or not name.startswith('__')
     }
 
     for binding in module_ref.bindings:
         if binding.name in exported_names:
-            binding.exported = True
+            binding._exported = True
 
 
 def resolve_imports(module_ref: ModuleRef) -> None:
@@ -140,7 +140,7 @@ def _link_wildcard(module_ref: ModuleRef, stmt: ast.ImportFrom, unresolved: Unre
         module_ref.tainted = True
         return
 
-    exported = {binding.name for binding in target.bindings if binding.exported}
+    exported = {binding.name for binding in target.bindings if binding._exported}
 
     for index, binding in enumerate(module_ref.bindings):
         if binding.name not in exported or not _is_unresolved_reference(binding):

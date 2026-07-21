@@ -2,9 +2,12 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, override
 
 from terser.ast_compat import ast
+from ...parser import ref
 from .util import arg_rename_in_place, insert
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from ...parser.ref import ModuleRef
 
 
@@ -18,85 +21,83 @@ class Binding(ABC):
 
     """
 
-    exported: bool
-    """Part of the module's public interface (listed in `__all__`, or not `_`-prefixed if there
-    is no `__all__`), independent of whether anything in the project actually imports it."""
+    _name: str | None
+    _allow_rename: bool
+    _exported: bool
+    _reserved: str | None
+    _references: list[ast.AST]
 
-    def __init__(self, name=None, allow_rename=True):
-        self._references = []
-
-        self._allow_rename = allow_rename
-
+    def __init__(self, name: str | None = None, allow_rename: bool = True):
         self._name = name
+        self._allow_rename = allow_rename
+        self._exported = False
         self._reserved = None
-        self.exported = False
+        self._references = []
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
 
     @property
-    def name(self):
+    def name(self) -> str | None:
         """
         The name for this binding
 
         This may be changed using the mangler() method.
         If this binding doesn't currently have a name, this returns None.
-
-        :rtype: str or None
-
         """
-
         return self._name
 
     @property
-    def allow_rename(self):
+    def allow_rename(self) -> bool:
         """
         Is it allowed to mangler this binding
-
-        :rtype: bool
-
         """
-
         return self._allow_rename
 
     def disallow_rename(self):
         """
         Prevent this binding from being renamed
         """
-
         self._allow_rename = False
 
     @property
-    def reserved(self):
+    def reserved(self) -> str | None:
         """
         A reserved name for this binding
 
         This may be a name which this binding reserves in it's reservation scope,
         regardless of if it is renamed.
-
-        :rtype: str or None
-
         """
-
         return self._reserved
 
     @property
-    def references(self):
+    def references(self) -> list[ast.AST]:
         """
         The ast Nodes that reference this binding
-
-        :rtype: list[ast.AST]
-
         """
-
         return self._references
 
     @property
-    def name_references(self):
+    def name_references(self) -> int:
         """
         The number of times the name is used
         """
         return len(self._references)
+
+    @property
+    def exported(self) -> bool:
+        """
+        Part of the module's public interface (listed in `__all__`, or not
+        `__`-prefixed if there is no `__all__`), independent of whether anything
+        in the project actually imports it.
+        """
+        return self._exported
+
+    def mark_exported(self):
+        """
+        Mark this binding is exported (used in another module)
+        """
+        self._exported = True
 
     def additional_byte_cost(self):
         """
@@ -253,7 +254,7 @@ class Binding(ABC):
 
         return mentions + (1 if arg_rename else 0)
 
-    def add_reference(self, node, allow_rename=True, reserved=None):
+    def add_reference(self, node: ast.AST, allow_rename: bool = True, reserved: str | None = None):
         """
         Add a new reference to this binding
 
@@ -261,13 +262,11 @@ class Binding(ABC):
         :type node: :class:`ast.AST`
         :param bool allow_rename: If this binding may be renamed
         :param str reserved: A name used by the node, even if the binding is renamed.
-        :param int rename_cost: Additional cost of renaming the reference, in bytes
-
         """
 
         self.references.append(node)
 
-        if allow_rename is False:
+        if not allow_rename:
             self.disallow_rename()
 
         if reserved is not None:
@@ -302,7 +301,9 @@ class NameBinding(Binding):
 
     """
 
-    def __init__(self, name, *args, **kwargs):
+    _name: str
+
+    def __init__(self, name: str, *args, **kwargs):
         super().__init__(name, *args, **kwargs)
 
         if name.startswith('__') and name.endswith('__'):
@@ -310,25 +311,33 @@ class NameBinding(Binding):
             self.disallow_rename()
 
     @override
-    def __repr__(self):
-        return self.__class__.__name__ + f"({self.name=}, {self.allow_rename=}, {self.exported=}) <references={len(self._references)}>"
+    @property
+    def name(self) -> str:
+        return self._name
 
     @override
-    def should_rename(self, new_name):
-        current_cost = len(self.references) * len(self._name)
+    def __repr__(self):
+        args = f"{self.name=}, {self.allow_rename=}, {self.exported=}"
+        return self.__class__.__name__ + f"({args}) <references={self.name_references}>"
+
+    @override
+    def should_rename(self, new_name: str):
+        current_cost = len(self.references) * len(self.name)
 
         old_mentions = self.old_mention_count()
         new_mentions = self.new_mention_count()
         additional_bytes = self.additional_byte_cost()
-        rename_cost = (old_mentions * len(self._name)) + (new_mentions * len(new_name)) + additional_bytes
+        rename_cost = (old_mentions * len(self.name)) + (new_mentions * len(new_name)) + additional_bytes
 
         return rename_cost <= current_cost
 
+    @override
     def disallow_rename(self):
         super().disallow_rename()
         self._reserved = self._name
 
-    def rename(self, new_name):
+    @override
+    def rename(self, new_name: str):
         func_namespace_binding = None
 
         for node in self.references:
@@ -341,15 +350,14 @@ class NameBinding(Binding):
             elif isinstance(node, ast.alias):
                 node.asname = None if new_name == node.name else new_name
             elif isinstance(node, ast.arg):
-
                 if arg_rename_in_place(node):
                     node.arg = new_name
+                    continue
 
+                if func_namespace_binding is None:
+                    func_namespace_binding: Any = ref(node).namespace
                 else:
-                    if func_namespace_binding is None:
-                        func_namespace_binding = node.namespace
-                    else:
-                        assert func_namespace_binding is node.namespace
+                    assert func_namespace_binding is ref(node).namespace
 
             elif isinstance(node, ast.ExceptHandler):
                 node.name = new_name
@@ -357,15 +365,12 @@ class NameBinding(Binding):
                 node.names = [new_name if n == self._name else n for n in node.names]
             elif isinstance(node, ast.arguments):
 
-                rename_vararg = (node.vararg == self._name) and not getattr(node, 'vararg_renamed', False)
-                rename_kwarg = (node.kwarg == self._name) and not getattr(node, 'kwarg_renamed', False)
-
-                if rename_vararg:
-                    node.vararg = new_name
-                    node.vararg_renamed = True
-                if rename_kwarg:
-                    node.kwarg = new_name
-                    node.kwarg_renamed = True
+                if (vararg := node.vararg) and (vararg.arg == self.name) and not getattr(node, "vararg_renamed", False):
+                    vararg.arg = new_name
+                    setattr(node, "vararg_renamed", True)
+                if (kwarg := node.vararg) and (kwarg.arg == self.name) and not getattr(node, "kwarg_renamed", False):
+                    kwarg.arg = new_name
+                    setattr(node, "kwarg_renamed", True)
 
             elif isinstance(node, ast.MatchAs):
                 node.name = new_name
@@ -380,7 +385,7 @@ class NameBinding(Binding):
             elif isinstance(node, ast.ParamSpec):
                 node.name = new_name
 
-        if func_namespace_binding is not None:
+        if func_namespace_binding:
             func_namespace_binding.body = list(
                 insert(
                     func_namespace_binding.body,

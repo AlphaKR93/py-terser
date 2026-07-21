@@ -1,11 +1,9 @@
 from abc import ABC
-from typing import override
-
-from alpha93.commons import type_checker
+from typing import TYPE_CHECKING, override
 
 from . import ast
 
-if type_checker.TYPE_CHECKING:
+if TYPE_CHECKING:
     from collections.abc import Callable
 
 

@@ -87,7 +87,7 @@ class NameBinder(NodeVisitor):
         self.generic_visit(node)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef):
-        self.visit_FunctionDef(node)    # type: ignore[invalid-type]
+        self.visit_FunctionDef(node)    # type: ignore[ty:invalid-argument-type]
 
     def visit_alias(self, node: ast.alias):
         if node.name == '*':

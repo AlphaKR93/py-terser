@@ -9,8 +9,12 @@ This is not intended to be a complete representation of the AST, some
 fields or field names may be omitted for clarity. It should still be precise and unambiguous.
 
 """
+from typing import TYPE_CHECKING
 
 from . import ast
+
+if TYPE_CHECKING:
+    from typing import TypeIs
 
 
 INDENT = '    '
@@ -63,7 +67,7 @@ default_fields = {
 }
 
 
-def is_constant_node(node: ast.AST, types):
+def is_constant_node[T: ast.AST](node: ast.AST, types: type[T] | tuple[type[T], ...]) -> TypeIs[T]:
     """
     Is a node one of the specified node types
 
@@ -79,7 +83,7 @@ def is_constant_node(node: ast.AST, types):
     """
 
     if not isinstance(types, tuple):
-        types = (types,)
+        types: tuple[type[T]] = (types,)
 
     for node_type in types:
         assert not isinstance(node_type, str)

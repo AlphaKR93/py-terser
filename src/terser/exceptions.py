@@ -1,7 +1,6 @@
-from alpha93.commons import type_checker
+from typing import TYPE_CHECKING
 
-
-if type_checker.TYPE_CHECKING:
+if TYPE_CHECKING:
     import ast
 
 

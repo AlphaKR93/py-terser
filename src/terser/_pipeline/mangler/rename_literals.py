@@ -86,7 +86,7 @@ class HoistedBinding(Binding):
         return rename_cost <= current_cost
 
 
-class HoistedValue(object):
+class HoistedValue:
     """
     HoistedValue comparator object
 

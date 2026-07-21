@@ -1,3 +1,4 @@
+from alpha93.commons import typed
 from ...ast_compat import ast
 from .expression_printer import ExpressionPrinter
 from .token_printer import Delimiter
@@ -25,15 +26,11 @@ class ModulePrinter(ExpressionPrinter):
         assert isinstance(module, ast.Module)
 
         self.visit_Module(module)
-        # On Python 2.7, preserve unicode strings to avoid encoding issues
-        code = unicode(self.printer) if sys.version_info[0] < 3 else str(self.printer)
-        return code.rstrip('\n' + self.indent_char + ';')
+        return str(self.printer).rstrip('\n' + self.indent_char + ';')
 
     @property
     def code(self):
-        # On Python 2.7, preserve unicode strings to avoid encoding issues
-        code = unicode(self.printer) if sys.version_info[0] < 3 else str(self.printer)
-        return code.rstrip('\n' + self.indent_char + ';')
+        return str(self.printer).rstrip('\n' + self.indent_char + ';')
 
     # region Simple Statements
 
@@ -144,7 +141,7 @@ class ModulePrinter(ExpressionPrinter):
 
         self.printer.keyword('return')
         if isinstance(node.value, ast.Tuple):
-            if sys.version_info < (3, 8) and [n for n in node.value.elts if isinstance(n, ast.Starred)]:
+            if [n for n in node.value.elts if isinstance(n, ast.Starred)]:
                 self.printer.delimiter('(')
                 self._testlist(node.value)
                 self.printer.delimiter(')')
@@ -155,7 +152,7 @@ class ModulePrinter(ExpressionPrinter):
         self.printer.end_statement()
 
     def visit_Print(self, node):
-        assert isinstance(node, ast.Print)
+        assert isinstance(node, ast.Print)  # type: ignore
 
         self.printer.keyword('print')
 
@@ -387,9 +384,9 @@ class ModulePrinter(ExpressionPrinter):
         self.visit_Try(node, star=True)
 
     def visit_TryFinally(self, node):
-        assert isinstance(node, ast.TryFinally)
+        assert isinstance(node, ast.TryFinally) # type: ignore
 
-        if len(node.body) == 1 and isinstance(node.body[0], ast.TryExcept):
+        if len(node.body) == 1 and isinstance(node.body[0], ast.TryExcept): # type: ignore
             self.visit_TryExcept(node.body[0])
         else:
             self.printer.newline()
@@ -403,7 +400,7 @@ class ModulePrinter(ExpressionPrinter):
             self._suite(node.finalbody)
 
     def visit_TryExcept(self, node):
-        assert isinstance(node, ast.TryExcept)
+        assert isinstance(node, ast.TryExcept)  # type: ignore
 
         self.printer.newline()
         self.printer.keyword('try')
@@ -780,11 +777,11 @@ class ModulePrinter(ExpressionPrinter):
 
     # endregion
 
-    def visit_Module(self, node):
-        if hasattr(node, 'docstring') and node.docstring is not None:
+    def visit_Module(self, node: ast.Module):
+        if doc := typed[str].getattr(node, "docstring", None):
             # Python 3.6 added a docstring field! Really useful for every use case except this one...
             # Put the docstring back into the body
-            self._suite_body([ast.Expr(value=ast.Str(s=node.docstring))] + node.body)
+            self._suite_body([ast.Expr(value=ast.Str(s=doc))] + node.body)
         else:
             self._suite_body(node.body)
 

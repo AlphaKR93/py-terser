@@ -4,7 +4,7 @@ import re
 import sys
 
 
-class TokenTypes(object):
+class TokenTypes:
     NoToken = 0
     Identifier = 1
     Keyword = 2
@@ -17,7 +17,7 @@ class TokenTypes(object):
     EndStatement = 9
 
 
-class Delimiter(object):
+class Delimiter:
     def __init__(self, terminal_printer, delimiter=',', add_parens=False):
         """
         Delimited group printer
@@ -77,7 +77,7 @@ class Delimiter(object):
             self._terminal_printer.delimiter(self._delimiter)
 
 
-class TokenPrinter(object):
+class TokenPrinter:
     """
     Concatenates terminal symbols of the python grammar
     """

@@ -1,9 +1,9 @@
-from alpha93.commons import type_checker
+from typing import TYPE_CHECKING
 
 from terser.ast_compat import ast
 from ._node import NodeRef
 
-if type_checker.TYPE_CHECKING:
+if TYPE_CHECKING:
     from typing import Final, TypeGuard
 
     from terser._pipeline.linker.binder.binding import Binding

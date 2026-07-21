@@ -1,13 +1,14 @@
 """
 For each node in an AST set the namespace to use for name binding and resolution
 """
+from typing import TYPE_CHECKING
 
-from alpha93.commons import type_checker, typed
+from alpha93.commons import typed
 
 from terser.ast_compat import ast
 from .ref import ref, is_scoped
 
-if type_checker.TYPE_CHECKING:
+if TYPE_CHECKING:
     from .ref import Comprehension, ContainsScope, Invokable, ModuleRef
 
 
@@ -170,11 +171,11 @@ class ScopeResolver:
 
 
     def __comprehension(self, node: Comprehension, /, namespace: ContainsScope):
-        if hasattr(node, "elt"):
-            self.__resolve(node.elt, namespace=node)
-        elif hasattr(node, "key"):
+        if isinstance(node, ast.DictComp):
             self.__resolve(node.key, namespace=node)
             self.__resolve(node.value, namespace=node)
+        else:
+            self.__resolve(node.elt, namespace=node)
 
         iter_namespace = namespace
         for generator in node.generators:

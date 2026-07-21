@@ -15,6 +15,10 @@ cli = [
     "pydantic>=2.13.4",
     "tqdm>=4.68.4",
 ]
+dev = [
+    "ruff>=0.15.22",
+    "ty>=0.0.61",
+]
 
 [project.scripts]
 terser = "python_minifier.cli:main"

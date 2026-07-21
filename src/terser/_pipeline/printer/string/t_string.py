@@ -11,7 +11,7 @@ This implementation is much simpler than f_string.py because:
 - Always use all quote types
 """
 
-from terser.ast_compat import CompareError, ast, compare_ast, is_constant_node
+from terser.ast import CompareError, ast, compare_ast, is_constant_node
 from terser.exceptions import InvalidTransformError
 from ..expression_printer import ExpressionPrinter
 from ..token_printer import TokenTypes

@@ -1,6 +1,6 @@
 from warnings import deprecated
 
-from terser.ast_compat import ast, is_constant_node
+from terser.ast import ast, is_constant_node
 
 
 NAMESPACED = (

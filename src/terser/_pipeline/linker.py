@@ -1,10 +1,10 @@
 from typing import TYPE_CHECKING
 
-from terser.ast_compat import ast
+from terser.ast import ast
 from .resolver.binding import ImportBinding
 
 if TYPE_CHECKING:
-    from .parser.ref import ModuleRef
+    from terser.ast import ModuleRef
     from .resolver.binding import UnresolvedModuleRef
 
 

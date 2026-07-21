@@ -1,13 +1,12 @@
 import builtins
 from typing import TYPE_CHECKING
 
-from terser.ast_compat import ast
-from ...parser.ref import ModuleRef, ref
+from terser.ast import ModuleRef, ast, ref
 from ..binding import Binding, BuiltinBinding, NameBinding
 from ..util import scope_ref_global, scope_ref_nonlocal
 
 if TYPE_CHECKING:
-    from ...parser.ref import ScopedNode
+    from terser.ast.ref import ScopedNode
 
 
 def __get_binding(name: str, namespace_ref: ScopedNode) -> Binding:

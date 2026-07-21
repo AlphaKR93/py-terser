@@ -1,4 +1,4 @@
-import terser.ast_compat.ast as ast
+import terser.ast.ast as ast
 
 
 def remove_posargs(node):

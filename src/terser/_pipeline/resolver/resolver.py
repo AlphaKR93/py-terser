@@ -1,14 +1,14 @@
 import builtins
 from typing import TYPE_CHECKING, override
 
-from terser.ast_compat import NodeVisitor, ast
-from ..parser import ref
+from terser.ast import NodeVisitor, ast, ref
 from .binding import Binding, ImportBinding, NameBinding
 from .util import arg_rename_in_place, scope_ref_global
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from ..parser.ref import ContainsScope, ModuleRef
+
+    from terser.ast.ref import ContainsScope, ModuleRef
 
 
 def resolve(module: ast.Module):

@@ -2,7 +2,7 @@ from abc import ABC
 from enum import IntFlag, auto
 from typing import TYPE_CHECKING, ClassVar, final
 
-from terser.ast_compat import NodeVisitor, ast
+from terser.ast import NodeVisitor, ast
 from ..parser._scope import ScopeResolver
 from ..parser import ref
 

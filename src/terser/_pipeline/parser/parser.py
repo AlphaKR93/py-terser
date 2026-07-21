@@ -1,17 +1,18 @@
 from typing import TYPE_CHECKING
 
-from terser.ast_compat import ast
+from terser.ast import DummySpec, ModuleRef, ast
 from ._scope import ScopeResolver
-from .ref import ModuleRef, spec as __spec
 
 if TYPE_CHECKING:
     from typing import Any
 
+    from terser.ast.ref import ModuleSpec
 
-def parse(source: str, spec: __spec.ModuleSpec | str, mode: str, **kwargs):
+
+def parse(source: str, spec: ModuleSpec | str, mode: str, **kwargs):
     if isinstance(spec, str):
         path = spec
-        spec = __spec.DummySpec(spec)
+        spec = DummySpec(spec)
     else:
         path = spec.path
 

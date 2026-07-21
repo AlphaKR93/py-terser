@@ -1,4 +1,4 @@
-from ...ast_compat import ast, is_constant_node
+from ...ast import ast, is_constant_node
 from .token_printer import Delimiter, TokenPrinter
 
 

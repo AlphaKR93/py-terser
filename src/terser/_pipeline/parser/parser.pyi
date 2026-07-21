@@ -1,8 +1,7 @@
-from .ref import ModuleSpec
 from ast import Module
 from typing import Literal
 
-from .ref import ModuleRef
+from terser.ast.ref import ModuleSpec, ModuleRef
 
 
 def parse(

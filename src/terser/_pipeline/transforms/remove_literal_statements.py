@@ -1,4 +1,4 @@
-import terser.ast_compat.ast as ast
+import terser.ast.ast as ast
 
 from terser._pipeline.transforms.suite_transformer import SuiteTransformer
 from terser.util import is_constant_node

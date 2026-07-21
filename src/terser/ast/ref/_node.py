@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, ClassVar
 
-from terser.ast_compat.ast import AST as Node, iter_child_nodes
+from terser.ast.ast import AST as Node, iter_child_nodes
 
 if TYPE_CHECKING:
     from ast import AST

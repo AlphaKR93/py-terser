@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from alpha93.commons import typed
 
-from terser.ast_compat import ast, is_constant_node
+from terser.ast import ast, is_constant_node
 from ..parser import ref, is_scoped
 
 if TYPE_CHECKING:

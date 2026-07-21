@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from ._scoped import SCOPED_T, ScopedNode, is_scoped
 from ._node import ref
-from ._module import ModuleSpec, ModuleRef, _spec as spec
+from ._module import DummySpec, ModuleSpec, ModuleRef, _spec as spec
 
 
 if TYPE_CHECKING:
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 __all__ = (
     "SCOPED_T",
+    "DummySpec",
     "ModuleSpec",
     "ModuleRef",
     "ScopedNode",

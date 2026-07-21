@@ -1,6 +1,10 @@
-from terser.ast_compat import ast
-from ...parser.ref import ModuleRef, ref
+from typing import TYPE_CHECKING
+
+from terser.ast import ast, ref
 from ..binding import ImportBinding, UnresolvedModuleRef
+
+if TYPE_CHECKING:
+    from terser.ast import ModuleRef
 
 
 def __target_path(module_ref: ModuleRef, module: str) -> str | None:

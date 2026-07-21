@@ -1,4 +1,4 @@
-from terser.ast_compat import ast as ast
+from terser.ast import ast as ast
 
 from .suite_transformer import SuiteTransformer
 

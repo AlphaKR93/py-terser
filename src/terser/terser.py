@@ -1,4 +1,4 @@
-from .ast_compat import CompareError, ast, compare_ast
+from .ast import CompareError, ast, compare_ast
 
 from .exceptions import InvalidTransformError
 from terser._pipeline.printer.module_printer import ModulePrinter

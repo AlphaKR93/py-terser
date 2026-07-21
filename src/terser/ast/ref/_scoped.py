@@ -1,12 +1,13 @@
 from typing import TYPE_CHECKING
 
-from terser.ast_compat import ast
+from .. import ast
 from ._node import NodeRef
 
 if TYPE_CHECKING:
     from typing import Final, TypeGuard
 
-    from ...resolver.binding import Binding
+    # noinspection protected-member
+    from terser._pipeline.resolver.binding import Binding
     from ._node import ContainsScope
 
 

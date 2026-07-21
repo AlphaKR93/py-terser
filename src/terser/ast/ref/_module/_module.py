@@ -1,13 +1,14 @@
 from typing import TYPE_CHECKING, final
 
-from terser.ast_compat import ast
+from terser.ast import ast
 from .._scoped import ScopedNode
 
 if TYPE_CHECKING:
     from typing import Final
 
+    # noinspection protected-member
+    from terser._pipeline.resolver.binding import ImportBinding, UnresolvedModuleRef
     from ._spec import ModuleSpec
-    from ....resolver.binding import ImportBinding, UnresolvedModuleRef
 
 
 @final

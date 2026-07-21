@@ -5,11 +5,10 @@ from typing import TYPE_CHECKING
 
 from alpha93.commons import typed
 
-from terser.ast_compat import ast
-from .ref import ref, is_scoped
+from terser.ast import ast, ref, is_scoped
 
 if TYPE_CHECKING:
-    from .ref import Comprehension, ContainsScope, Invokable, ModuleRef
+    from terser.ast.ref import Comprehension, ContainsScope, Invokable, ModuleRef
 
 
 class ScopeResolver:

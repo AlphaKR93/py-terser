@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING
 
-from terser.ast_compat import ast, is_constant_node
-from ...parser import ref
+from terser.ast import ast, is_constant_node, ref
 
 if TYPE_CHECKING:
     from typing import TypeIs

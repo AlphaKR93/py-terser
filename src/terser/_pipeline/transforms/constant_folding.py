@@ -1,7 +1,7 @@
 import math
 import sys
 
-from terser.ast_compat import ast, compare_ast, is_constant_node
+from terser.ast import ast, compare_ast, is_constant_node
 
 from ..printer.expression_printer import ExpressionPrinter
 from .suite_transformer import SuiteTransformer

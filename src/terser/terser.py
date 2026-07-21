@@ -48,7 +48,7 @@ def unparse(
     return printer.code
 
 
-def minify(
+def minify0(
     source: str,
     config: TransformConfig,
     path: str = "<unknown>",

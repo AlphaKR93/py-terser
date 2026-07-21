@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from terser.ast.ref import ModuleSpec
 
 
-def parse(source: str, spec: ModuleSpec | str, mode: str, **kwargs):
+def parse(source: str, spec: ModuleSpec | str, mode: str = "exec", **kwargs):
     if isinstance(spec, str):
         path = spec
         spec = DummySpec(spec)

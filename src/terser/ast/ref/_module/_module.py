@@ -7,7 +7,9 @@ if TYPE_CHECKING:
     from typing import Final
 
     # noinspection protected-member
-    from terser._pipeline.resolver.binding import ImportBinding, UnresolvedModuleRef
+    from terser._pipeline.resolver.binder import UnresolvedModuleRef
+    # noinspection protected-member
+    from terser._pipeline.resolver.binding import ImportBinding
     from ._spec import ModuleSpec
 
 

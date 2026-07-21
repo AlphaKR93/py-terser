@@ -89,6 +89,10 @@ class PackageSpec(ModuleSpec):
     def is_root_module(self) -> bool:
         return '.' not in str(self)
 
+    @property
+    def children(self) -> dict[str, ModuleSpec]:
+        return self.__children  # type: ignore[ty:invalid-return-type] # wtf?
+
     def register(self, module: PackageSpec | PackageModuleSpec):
         self.__children[module.name] = module
 

@@ -21,6 +21,8 @@ class RemoveAnnotationOptions:
 
 @dataclass()
 class TransformConfig:
+    passes: int = 5
+
     optimize: Literal[-1, 0, 1, 2] = -1
 
     remove_literal_statements: bool = False

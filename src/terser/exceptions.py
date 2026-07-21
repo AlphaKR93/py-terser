@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import ast
+    from .ast.ref import ModuleSpec
 
 
 class InvalidTransformError(RuntimeError):
@@ -13,11 +14,11 @@ class InvalidTransformError(RuntimeError):
     This should never occur and is a bug.
     """
 
-    def __init__(self, exception: Exception, path: str, source: str | None, module: ast.AST):
+    def __init__(self, exception: Exception, spec: ModuleSpec | str, source: str | None, module: ast.AST):
         self.exception = exception
         self.source = source
         self.module = module
-        self.path = path
+        self.spec, self.path = (None, spec) if isinstance(spec, str) else (spec, spec.path)
 
     def __str__(self):
         return 'Minification was unstable! Please create an issue at https://github.com/dflook/python-minifier/issues'

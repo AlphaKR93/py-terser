@@ -5,7 +5,7 @@ from .resolver.binding import ImportBinding
 
 if TYPE_CHECKING:
     from terser.ast import ModuleRef
-    from .resolver.binding import UnresolvedModuleRef
+    from .resolver.binder import UnresolvedModuleRef
 
 
 def _link_alias(

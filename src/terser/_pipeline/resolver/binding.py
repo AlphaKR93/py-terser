@@ -398,29 +398,6 @@ class NameBinding(Binding):
         self._name = new_name
 
 
-class UnresolvedModuleRef:
-    """
-    A module path, resolved from an import statement via `Namespace.resolve()`.
-
-    This only needs the importing module's own `Namespace`, so it can be computed independently
-    for every module (e.g. from a worker thread), without waiting on any other module's ModuleRef.
-
-    :param path: The resolved path, or None if `Namespace.resolve()` rejected it (e.g. a relative
-        import that climbs above the project root)
-    :param submodule_path: For `from x import y`, y may be either a name defined in x or a
-        submodule of x - this is the resolved path for the latter case. None for plain imports.
-    """
-
-    __slots__ = ('path', 'submodule_path')
-
-    def __init__(self, path: str | None, submodule_path: str | None = None):
-        self.path = path
-        self.submodule_path = submodule_path
-
-    def __repr__(self):
-        return f"UnresolvedModuleRef({self.path=}, {self.submodule_path=})"
-
-
 class ImportBinding(NameBinding):
     """
     Represents the binding of a name introduced by an import
@@ -436,7 +413,7 @@ class ImportBinding(NameBinding):
     tracked separately, in `ModuleRef.import_targets`.
     """
 
-    target: 'ModuleRef | None'
+    target: ModuleRef | None
     target_name: str | None
 
     def __init__(self, name, node, *args, **kwargs):

@@ -18,6 +18,10 @@ class Binding(ABC):
 
     """
 
+    exported: bool
+    """Part of the module's public interface (listed in `__all__`, or not `_`-prefixed if there
+    is no `__all__`), independent of whether anything in the project actually imports it."""
+
     def __init__(self, name=None, allow_rename=True):
         self._references = []
 
@@ -25,6 +29,7 @@ class Binding(ABC):
 
         self._name = name
         self._reserved = None
+        self.exported = False
 
     def __repr__(self):
         return self.__class__.__name__ + '()'
@@ -306,7 +311,7 @@ class NameBinding(Binding):
 
     @override
     def __repr__(self):
-        return self.__class__.__name__ + f"({self.name=}, {self.allow_rename=}) <references={len(self._references)}>"
+        return self.__class__.__name__ + f"({self.name=}, {self.allow_rename=}, {self.exported=}) <references={len(self._references)}>"
 
     @override
     def should_rename(self, new_name):
@@ -421,13 +426,13 @@ class ImportBinding(NameBinding):
         introduced by `from x import *` (there is no per-name alias node in that case)
     :type node: ast.alias or ast.ImportFrom
 
-    `target` holds an UnresolvedModuleRef once `resolve_import_paths` has run (module-local,
-    every module in the project need not be bound yet), and is replaced with the actual
-    ModuleRef (or None, if the import resolves outside the project) once `link_imports` has run
-    (needs every module in the project to be bound). `target_name` is only set by `link_imports`.
+    `target`/`target_name` are only filled in by `link_imports`, once every module in the project
+    has been bound. Until then (and for imports that resolve outside the project - stdlib,
+    third-party), `target` stays None. The path resolved by `resolve_imports` in the meantime is
+    tracked separately, in `ModuleRef.import_targets`.
     """
 
-    target: 'ModuleRef | UnresolvedModuleRef | None'
+    target: 'ModuleRef | None'
     target_name: str | None
 
     def __init__(self, name, node, *args, **kwargs):

@@ -95,7 +95,7 @@ class NameBinder(NodeVisitor):
             # which are only known once every module in the project has been bound.
             from_node = ref(node)._parent
             assert isinstance(from_node, ast.ImportFrom)
-            self.module_ref.wildcard_imports.append(from_node)
+            self.module_ref.wildcard_targets.setdefault(from_node, None)
             return
 
         root_module = node.name.split('.')[0]
@@ -111,7 +111,7 @@ class NameBinder(NodeVisitor):
                 binding = self.__get_binding(node.asname, namespace, factory)
                 binding.add_reference(node)
                 if isinstance(binding, ImportBinding):
-                    self.module_ref.import_bindings.add(binding)
+                    self.module_ref.import_targets.setdefault(binding, None)
         else:
             # This binds the root module only for a dotted import
 
@@ -119,7 +119,7 @@ class NameBinder(NodeVisitor):
                 binding = self.__get_binding(root_module, namespace, factory)
                 binding.add_reference(node)
                 if isinstance(binding, ImportBinding):
-                    self.module_ref.import_bindings.add(binding)
+                    self.module_ref.import_targets.setdefault(binding, None)
 
                 if '.' in node.name:
                     binding.disallow_rename()

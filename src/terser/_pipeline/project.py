@@ -50,41 +50,6 @@ class SourceRoot:
         self.__unresolved[str(namespace)] = namespace
         return namespace
 
-    @staticmethod
-    def __walk(d: NestedDict[UnresolvedModule], ns: list[str]) -> NestedDict[UnresolvedModule]:
-        t: NestedDict[UnresolvedModule] | UnresolvedModule | None = d.get(c := ns.pop(0))
-        if not t:
-            t = d[c] = {}
-        elif isinstance(t, UnresolvedModule):
-            raise RuntimeError("conflict")
-
-        t: NestedDict[UnresolvedModule]
-        if not len(ns):
-            return t
-        return SourceRoot.__walk(t, ns)
-
-    def __aligned_packages(self, roots: set[str]):
-        aligned: NestedDict[UnresolvedModule] = {}
-        resolved: dict[str, Package] = {}
-
-        def packages(t: NestedDict[UnresolvedModule], parent: Package | None = None):
-            current = None
-            if unresolved := t.get("__init__"):
-                current = Package(unresolved, parent)
-                if parent: parent.register(current)
-                else: resolved[str(current)] = current
-
-            for k, v in t.items():
-                if k == "__init__":
-                    continue
-
-                if isinstance(v, dict):
-                    packages(v, current)
-
-        for root in roots:
-            ns = str(root).split('.')
-            self.__walk(aligned, ns[:-1])[ns[-1]] = self.__unresolved[root]
-
     def align(self):
         aligned: NestedDict[UnresolvedModule] = {}
         resolved: dict[str, Package | SingleFileModule] = {}

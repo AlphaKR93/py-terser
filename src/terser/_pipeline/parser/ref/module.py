@@ -18,26 +18,22 @@ class _Root(ast.AST):
 class ModuleRef(ScopedNode[ast.Module]):
     tainted: bool
     preserved: set[str]
-    imports: dict[str, ast.AST]
 
-    import_bindings: set[ImportBinding]
-    """Every ImportBinding created while binding this module, for the cross-module linking step"""
+    import_targets: dict[ImportBinding, UnresolvedModuleRef | None]
+    """Every ImportBinding created while binding this module, mapped to its resolved path once
+    `resolve_imports` has run (None until then)"""
 
-    wildcard_imports: list[ast.ImportFrom]
-    """`from x import *` statements, deferred until the target module's exports are known"""
-
-    wildcard_targets: list[tuple[ast.ImportFrom, UnresolvedModuleRef]]
-    """The resolved path for each of `wildcard_imports`, filled in by `resolve_import_paths`"""
+    wildcard_targets: dict[ast.ImportFrom, UnresolvedModuleRef | None]
+    """Every `from x import *` statement in this module, mapped to its resolved path once
+    `resolve_imports` has run (None until then)"""
 
     name: Namespace
 
     def __init__(self, module: ast.Module, name: Namespace):
         self.tainted = False
         self.preserved = set()
-        self.imports = {}
-        self.import_bindings = set()
-        self.wildcard_imports = []
-        self.wildcard_targets = []
+        self.import_targets = {}
+        self.wildcard_targets = {}
         self.name = name
 
         super().__init__(module, None)  # type: ignore[invalid-type]

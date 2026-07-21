@@ -1,21 +1,12 @@
-.tox/
-.idea/
-__pycache__/
+test.py
+
+### Python
 *.py[cod]
-dist/
-downloads/
-eggs/
-.eggs/
-wheels/
-*.egg-info/
-*.egg
-venv/
-venv*/
-docs/build/
-docs/source/transforms/*.min.py
-.cache/
-.pytest_cache/
-.circleci-config.yml
-.coverage
-.mypy_cache/
-.tox/
+__pycache__/
+
+# VirtualEnv
+.venv/
+.env
+.env.*
+*.env
+*.env.*

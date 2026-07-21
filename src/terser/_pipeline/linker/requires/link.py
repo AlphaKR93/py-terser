@@ -20,39 +20,25 @@ def _import_from_target(module_ref: ModuleRef, stmt: ast.ImportFrom, name: str |
     return UnresolvedModuleRef(_target_path(module_ref, package), _target_path(module_ref, submodule))
 
 
-def resolve_imports(module_ref: ModuleRef) -> None:
+def _binding_target(module_ref: ModuleRef, binding: ImportBinding) -> UnresolvedModuleRef:
+    node = binding.node
+    stmt = ref(node)._parent
+
+    if isinstance(stmt, ast.ImportFrom):
+        return _import_from_target(module_ref, stmt, node.name)
+
+    assert isinstance(stmt, ast.Import)
+    # A dotted import without asname only binds the root package (see NameBinder.visit_alias)
+    module = node.name if node.asname is not None else binding.name
+    return UnresolvedModuleRef(_target_path(module_ref, module))
+
+
+def _module_all(module_ref: ModuleRef) -> list[str] | None:
     """
-    Resolve every import in `module_ref` to a module path, using only `module_ref`'s own
-    Namespace. Safe to run independently per module - e.g. from a worker thread - immediately
-    after `binder.bind`, without waiting on any other module in the project.
-
-    Must run before `binder.resolve`, so `link_imports` (which needs every module in the project
-    to have run this step) has a resolved path to work with for every ImportBinding.
+    The names listed in `module_ref`'s `__all__`, or None if it has no statically resolvable
+    `__all__` (either absent, or built dynamically)
     """
-
-    for binding in module_ref.import_bindings:
-        node = binding.node
-        stmt = ref(node)._parent
-
-        if isinstance(stmt, ast.ImportFrom):
-            binding.target = _import_from_target(module_ref, stmt, node.name)
-        else:
-            assert isinstance(stmt, ast.Import)
-            # A dotted import without asname only binds the root package (see NameBinder.visit_alias)
-            module = node.name if node.asname is not None else binding.name
-            binding.target = UnresolvedModuleRef(_target_path(module_ref, module))
-
-    module_ref.wildcard_targets = [
-        (stmt, _import_from_target(module_ref, stmt, None)) for stmt in module_ref.wildcard_imports
-    ]
-
-
-def _module_all(target: ModuleRef) -> list[str] | None:
-    """
-    The names listed in `target`'s `__all__`, or None if `target` has no statically
-    resolvable `__all__` (either absent, or built dynamically)
-    """
-    for stmt in target._ast.body:
+    for stmt in module_ref._ast.body:
         if not isinstance(stmt, ast.Assign):
             continue
         if len(stmt.targets) != 1 or not isinstance(stmt.targets[0], ast.Name):
@@ -76,25 +62,49 @@ def _has_binding(target: ModuleRef, name: str) -> bool:
     return any(binding.name == name for binding in target.bindings)
 
 
-def _exported_names(target: ModuleRef) -> list[str]:
-    """The names a `from target import *` pulls into the importing module's scope"""
-    all_ = _module_all(target)
-    if all_ is not None:
-        return all_
-
-    return [binding.name for binding in target.bindings if not binding.name.startswith('_')]
-
-
 def _is_unresolved_reference(binding: Binding) -> bool:
     """Does `binding` merely record uses of an otherwise undefined name (no definition site)?"""
     return all(isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) for node in binding.references)
 
 
-def _link_alias(binding: ImportBinding, project: dict[str, ModuleRef]) -> None:
-    unresolved = binding.target
-    assert isinstance(unresolved, UnresolvedModuleRef)
-    binding.target = None
+def mark_exports(module_ref: ModuleRef) -> None:
+    """
+    Flag the module-level bindings that make up `module_ref`'s public interface - importable via
+    `from module_ref import name` or `from module_ref import *`, regardless of whether the
+    project actually imports them.
 
+    Only needs `module_ref`'s own AST/bindings. Safe to run independently per module, immediately
+    after `binder.bind`.
+    """
+
+    all_ = _module_all(module_ref)
+    exported_names = set(all_) if all_ is not None else {
+        binding.name for binding in module_ref.bindings if not binding.name.startswith('__')
+    }
+
+    for binding in module_ref.bindings:
+        if binding.name in exported_names:
+            binding.exported = True
+
+
+def resolve_imports(module_ref: ModuleRef) -> None:
+    """
+    Resolve every import in `module_ref` to a module path, using only `module_ref`'s own
+    Namespace. Safe to run independently per module - e.g. from a worker thread - immediately
+    after `binder.bind`, without waiting on any other module in the project.
+
+    Must run before `binder.resolve`, so `link_imports` (which needs every module in the project
+    to have run this step) has a resolved path to work with for every import.
+    """
+
+    for binding in module_ref.import_targets:
+        module_ref.import_targets[binding] = _binding_target(module_ref, binding)
+
+    for stmt in module_ref.wildcard_targets:
+        module_ref.wildcard_targets[stmt] = _import_from_target(module_ref, stmt, None)
+
+
+def _link_alias(binding: ImportBinding, unresolved: UnresolvedModuleRef, project: dict[str, ModuleRef]) -> None:
     package_target = project.get(unresolved.path) if unresolved.path is not None else None
 
     if unresolved.submodule_path is None:
@@ -130,7 +140,7 @@ def _link_wildcard(module_ref: ModuleRef, stmt: ast.ImportFrom, unresolved: Unre
         module_ref.tainted = True
         return
 
-    exported = set(_exported_names(target))
+    exported = {binding.name for binding in target.bindings if binding.exported}
 
     for index, binding in enumerate(module_ref.bindings):
         if binding.name not in exported or not _is_unresolved_reference(binding):
@@ -141,19 +151,15 @@ def _link_wildcard(module_ref: ModuleRef, stmt: ast.ImportFrom, unresolved: Unre
             upgraded.add_reference(node)
 
         upgraded.target = target
-        if _has_binding(target, binding.name):
-            upgraded.target_name = binding.name
-        else:
-            # Listed in __all__, but not itself a binding in the target module (PEP 562)
-            upgraded.disallow_rename()
+        upgraded.target_name = binding.name  # exported implies target actually has this binding
 
         module_ref.bindings[index] = upgraded
 
 
 def link_imports(module_ref: ModuleRef, project: dict[str, ModuleRef]) -> None:
     """
-    Resolve every ImportBinding's target and expand wildcard imports, using the other modules
-    in the project. Must run after every module in the project has run `resolve_import_paths`
+    Resolve every import's target and expand wildcard imports, using the other modules in the
+    project. Must run after every module in the project has run `resolve_imports`, `mark_exports`
     and `binder.resolve` (the latter so undefined-but-used names have their fallback binding, for
     `_link_wildcard` to upgrade).
 
@@ -161,8 +167,8 @@ def link_imports(module_ref: ModuleRef, project: dict[str, ModuleRef]) -> None:
     :param project: Every module in the project, keyed by resolved module path
     """
 
-    for binding in module_ref.import_bindings:
-        _link_alias(binding, project)
+    for binding, unresolved in module_ref.import_targets.items():
+        _link_alias(binding, unresolved, project)
 
-    for stmt, unresolved in module_ref.wildcard_targets:
+    for stmt, unresolved in module_ref.wildcard_targets.items():
         _link_wildcard(module_ref, stmt, unresolved, project)

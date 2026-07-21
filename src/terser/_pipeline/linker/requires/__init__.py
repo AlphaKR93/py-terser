@@ -1,2 +1,1 @@
-from .link import link_imports, resolve_imports
-from .resolver import ImportResolver
+from .link import link_imports, mark_exports, resolve_imports

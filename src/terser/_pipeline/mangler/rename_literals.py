@@ -3,7 +3,7 @@ from terser.ast.annotation import get_parent, set_parent
 
 from terser._pipeline.mangler import Binding
 from terser._pipeline.mangler.util import insert
-from terser._pipeline.transforms.suite_transformer import NodeVisitor
+from terser._pipeline.transforms._suite import NodeVisitor
 from terser.util import is_constant_node
 
 

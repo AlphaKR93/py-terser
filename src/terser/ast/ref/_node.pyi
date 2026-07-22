@@ -3,8 +3,9 @@ from abc import ABC
 from ast import AST
 from typing import overload, ClassVar
 
-from . import ModuleRef
-from terser._pipeline.parser.ref._scoped import ScopedNode
+from terser._pipeline.resolver.binding import Binding
+from ._module import ModuleRef
+from ._scoped import ScopedNode
 
 
 type Invokable = ast.FunctionDef | ast.AsyncFunctionDef | ast.Lambda
@@ -13,8 +14,10 @@ type ContainsScope = ast.Module | ast.ClassDef | Invokable | Comprehension
 
 
 class NodeRef[T: AST](ABC):
-    _klass: ClassVar[dict[type[ast.AST], type[NodeRef]]]
+    _KLASSES: ClassVar[dict[type[ast.AST], type[NodeRef]]]
+
     _ast: T
+    _binding: Binding
     _parent: AST
 
     namespace: ContainsScope

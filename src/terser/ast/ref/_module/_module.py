@@ -50,4 +50,4 @@ class ModuleRef(ScopedNode[ast.Module]):
     def _parent(self):
         raise ValueError("Root node cannot have parent")
 
-ScopedNode._klass[ast.Module] = ModuleRef
+ScopedNode._KLASSES[ast.Module] = ModuleRef

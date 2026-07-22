@@ -4,7 +4,7 @@ import sys
 from terser.ast import ast, compare_ast, is_constant_node
 
 from ..printer.expression_printer import ExpressionPrinter
-from .suite_transformer import SuiteTransformer
+from ._suite import SuiteTransformer
 
 
 def is_foldable_constant(node):

@@ -6,13 +6,17 @@ if TYPE_CHECKING:
     from ast import AST
     from typing import Final
 
+    from terser._pipeline.resolver.binding import Binding
+
 
 _FIELD = "__AST_NodeRef__ref__"
 
 
 class NodeRef[T: AST]:
-    _klass: ClassVar[dict[type[AST], type[NodeRef]]] = {}
+    _KLASSES: ClassVar[dict[type[AST], type[NodeRef]]] = {}
+
     _ast: Final[T]
+    _bind: Binding
     _parent: AST
 
     def __init__(self, node: T, parent: AST):
@@ -24,7 +28,7 @@ class NodeRef[T: AST]:
 
     @classmethod
     def new(cls, node: AST, parent: AST):
-        if cls_ := NodeRef._klass.get(type(node)):
+        if cls_ := NodeRef._KLASSES.get(type(node)):
             return cls_(node, parent)
 
         return cls(node, parent)

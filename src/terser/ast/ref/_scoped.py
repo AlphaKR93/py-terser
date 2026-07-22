@@ -35,7 +35,7 @@ class ScopedNode[T: ContainsScope](NodeRef[T]):
         self.nonlocals = set()
 
 for k in SCOPED_T:
-    NodeRef._klass[k] = ScopedNode
+    NodeRef._KLASSES[k] = ScopedNode
 
 def is_scoped(node: ast.AST) -> TypeGuard[ContainsScope]:
     return isinstance(node, SCOPED_T)

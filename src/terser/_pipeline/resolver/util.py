@@ -2,11 +2,10 @@ from typing import TYPE_CHECKING
 
 from alpha93.commons import typed
 
-from terser.ast import ast, is_constant_node
-from ..parser import ref, is_scoped
+from terser.ast import ast, ref, is_constant_node, is_scoped
 
 if TYPE_CHECKING:
-    from ..parser.ref import Invokable, ModuleRef, ScopedNode
+    from terser.ast.ref import Invokable, ModuleRef, ScopedNode
 
 
 def scope_ref_global(node: ast.AST) -> ModuleRef:

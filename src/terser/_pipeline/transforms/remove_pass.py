@@ -1,6 +1,6 @@
 import terser.ast.ast as ast
 
-from terser._pipeline.transforms.suite_transformer import SuiteTransformer
+from terser._pipeline.transforms._suite import SuiteTransformer
 
 
 class RemovePass(SuiteTransformer):

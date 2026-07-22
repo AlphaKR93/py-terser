@@ -263,7 +263,8 @@ class Binding(ABC):
         :param str reserved: A name used by the node, even if the binding is renamed.
         """
 
-        self.references.append(node)
+        self._references.append(node)
+        ref(node)._binding = self
 
         if not allow_rename:
             self.disallow_rename()

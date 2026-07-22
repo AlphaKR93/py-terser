@@ -122,7 +122,7 @@ class PackageModuleSpec(ModuleSpec):
     def __init__(self, unresolved: ModuleSpec, parent: PackageSpec):
         super().__init__(str(unresolved))
         self.__parent = parent
-        self.__suffix = unresolved.path.suffix.strip('.')
+        self.__suffix = unresolved.path.suffix
 
     @override
     @property

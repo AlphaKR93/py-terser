@@ -1,6 +1,6 @@
 from terser.ast import ast as ast
 
-from .suite_transformer import SuiteTransformer
+from ._suite import SuiteTransformer
 
 
 class CombineImports(SuiteTransformer):

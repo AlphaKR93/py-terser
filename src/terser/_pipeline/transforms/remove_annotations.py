@@ -4,7 +4,7 @@ import terser.ast.ast as ast
 from terser.ast.annotation import get_parent
 
 from terser._pipeline.transforms import RemoveAnnotationsOptions
-from terser._pipeline.transforms.suite_transformer import SuiteTransformer
+from terser._pipeline.transforms._suite import SuiteTransformer
 
 
 class RemoveAnnotations(SuiteTransformer):

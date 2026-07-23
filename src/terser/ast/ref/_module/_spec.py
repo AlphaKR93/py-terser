@@ -35,6 +35,7 @@ class DummySpec(ModuleSpec):
 
     def __init__(self, name: str):
         super().__init__(f"terser.{name}")
+        self.__name = name
 
     @override
     @property

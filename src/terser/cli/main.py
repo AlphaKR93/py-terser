@@ -1,13 +1,16 @@
 from __future__ import print_function
 
 import argparse
+import asyncio
 import os
 import sys
 
 from alpha93.argparse import arguments_from_model
 
-from terser import minify
-from ._argv import TerserArguments, TerserParsedArguments
+from terser import minify, minify_project
+from .._pipeline.mangler.util import preserved_names
+from ._argv import TerserArguments, TerserParsedArguments, parse_preserve
+from ._tqdm import TqdmReporter
 
 
 class MinificationNotBeneficialError(Exception):
@@ -32,11 +35,20 @@ def main():
       # Minifying all *.py files in a directory
       pyminify src/ --in-place
 
+      # Minifying a directory to a separate output directory
+      pyminify src/ --output build/
+
       # Minifying multiple paths in place
       pyminify file1.py file2.py src/ --in-place
     """
 
     args = parse_args()
+
+    # Directories and multiple paths are minified as a project (whole-project name
+    # resolution/linking), so route them separately.
+    if is_project_mode(args):
+        asyncio.run(do_minify_project(args))
+        return
 
     # minify stdin
     if len(args.path) == 1 and next(iter(args.path)) == '-':
@@ -60,37 +72,40 @@ def main():
             sys.stdout.buffer.write(minified)
         return
 
-    for path in source_modules(args):
-        if args.output or args.in_place:
-            sys.stdout.write(path + '\n')
+    # parse_args() only allows a single, non-directory path to reach this point
+    path = next(iter(args.path))
 
-        with open(path, 'rb') as f:
-            source = f.read()
+    with open(path, 'rb') as f:
+        source = f.read()
 
-        try:
-            minified = do_minify(source, path, args)
-        except MinificationNotBeneficialError:
-            # Use original source when minification isn't beneficial
-            if args.in_place:
-                # File is already the original, no need to write
-                pass
-            elif args.output:
-                # Write original source to output
-                with open(args.output, 'wb') as f:
-                    f.write(source)
-            else:
-                # Write original source to stdout
-                stdout_write_bytes(source)
-            continue
-
-        if args.in_place:
-            with open(path, 'wb') as f:
-                f.write(minified)
-        elif args.output:
-            with open(args.output, 'wb') as f:
-                f.write(minified)
+    try:
+        minified = do_minify(source, path, args)
+    except MinificationNotBeneficialError:
+        # Use original source when minification isn't beneficial
+        if args.output_options.output:
+            with open(args.output_options.output, 'wb') as f:
+                f.write(source)
         else:
-            stdout_write_bytes(minified)
+            stdout_write_bytes(source)
+        return
+
+    if args.output_options.output:
+        with open(args.output_options.output, 'wb') as f:
+            f.write(minified)
+    else:
+        stdout_write_bytes(minified)
+
+
+def is_project_mode(args: TerserParsedArguments) -> bool:
+    """Whether whole-project linking (multiple modules, cross-file renames) is needed."""
+
+    if args.output_options.in_place:
+        return True
+    if len(args.path) > 1:
+        return True
+
+    path = next(iter(args.path))
+    return path != '-' and os.path.isdir(path)
 
 
 def parse_args() -> TerserParsedArguments:
@@ -116,29 +131,17 @@ def parse_args() -> TerserParsedArguments:
     if '-' in args.path and args.output_options.in_place:
         sys.stderr.write('error: reading from stdin, --in-place is not valid\n')
         sys.exit(1)
-    if len(args.path) > 1 and not args.output_options.in_place:
-        sys.stderr.write('error: multiple path arguments, --in-place required\n')
+    if len(args.path) > 1 and not (args.output_options.in_place or args.output_options.output):
+        sys.stderr.write('error: multiple path arguments, --in-place or --output required\n')
         sys.exit(1)
-    if len(args.path) == 1 and os.path.isdir(p := next(iter(args.path))) and not args.output_options.in_place:
-        sys.stderr.write('error: path ' + p + ' is a directory, --in-place required\n')
+    if len(args.path) == 1 and os.path.isdir(p := next(iter(args.path))) and not (args.output_options.in_place or args.output_options.output):
+        sys.stderr.write('error: path ' + p + ' is a directory, --in-place or --output required\n')
+        sys.exit(1)
+    if not is_project_mode(args) and (args.mangling_options.rename_globals or args.mangling_options.preserve_globals):
+        sys.stderr.write('error: --rename-globals/--preserve-globals require a directory, multiple paths, or --in-place, since global renaming needs whole-project linking\n')
         sys.exit(1)
 
     return args
-
-
-def source_modules(args):
-
-    def error(os_error):
-        raise os_error
-
-    for path_arg in args.path:
-        if os.path.isdir(path_arg):
-            for root, _dirs, files in os.walk(path_arg, onerror=error, followlinks=True):
-                for file in files:
-                    if file.endswith(('.py', '.pyw')):
-                        yield os.path.join(root, file)
-        else:
-            yield path_arg
 
 
 def do_minify(source: bytes, path: str, args: TerserParsedArguments) -> bytes:
@@ -146,34 +149,22 @@ def do_minify(source: bytes, path: str, args: TerserParsedArguments) -> bytes:
 
     :param bytes source: Source code as bytes (from file 'rb' or stdin.buffer)
     :param str path: Filename for error reporting
-    :param argparse.Namespace args: CLI arguments for minification options
+    :param TerserParsedArguments args: CLI arguments for minification options
     :returns: Minified source code as UTF-8 bytes
     :raises MinificationNotBeneficialError: When minified output is larger than original
     """
 
-    # TODO: Migrate into Pydantic models
-    preserve_globals = []
-    if args.preserve_globals:
-        for arg in args.preserve_globals:
-            names = [name.strip() for name in arg.split(',') if name]
-            preserve_globals.extend(names)
-    preserve_locals = []
-    if args.preserve_locals:
-        for arg in args.preserve_locals:
-            names = [name.strip() for name in arg.split(',') if name]
-            preserve_locals.extend(names)
+    preserve_locals = sorted(preserved_names(path, parse_preserve(args.mangling_options.preserve_locals)))
 
     minified_result = minify(
-        source,
+        source.decode('utf-8'),
         args.transform_options,
-        path=path,
-        hoist_literals=args.hoist_literals,
-        rename_locals=args.rename_locals,
-        preserve_locals=preserve_locals,
-        rename_globals=args.rename_globals,
-        preserve_globals=preserve_globals,
+        path,
         preserve_shebang=args.preserve_shebang,
         prefer_single_line=args.prefer_single_line,
+        hoist_literals=args.mangling_options.hoist_literals,
+        rename_locals=args.mangling_options.rename_locals,
+        preserve_locals=preserve_locals,
     )
 
     # Encode minified result to bytes for comparison and output
@@ -188,3 +179,27 @@ def do_minify(source: bytes, path: str, args: TerserParsedArguments) -> bytes:
         raise MinificationNotBeneficialError("Minified output is longer than original")
 
     return minified_bytes
+
+
+async def do_minify_project(args: TerserParsedArguments):
+    """Minify a directory/multi-file project, using whole-project linking.
+
+    Writes back to each module's own file (--in-place), or under the --output
+    directory (mirroring each module's path relative to its source root).
+    """
+
+    await minify_project(
+        args.path,
+        args.transform_options,
+        args.output_options.output,
+        TqdmReporter(),
+        hoist_literals=args.mangling_options.hoist_literals,
+        rename_locals=args.mangling_options.rename_locals,
+        preserve_locals=parse_preserve(args.mangling_options.preserve_locals),
+        rename_globals=args.mangling_options.rename_globals,
+        preserve_globals=parse_preserve(args.mangling_options.preserve_globals),
+    )
+
+
+def stdout_write_bytes(data: bytes):
+    sys.stdout.buffer.write(data)

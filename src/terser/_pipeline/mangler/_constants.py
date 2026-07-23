@@ -1,15 +1,11 @@
-import terser.ast.ast as ast
-from terser.ast.annotation import get_parent, set_parent
-
-from terser._pipeline.mangler import Binding
-from terser._pipeline.mangler.util import insert
-from terser._pipeline.transforms._suite import NodeVisitor
-from terser.util import is_constant_node
+from terser.ast import NodeVisitor, ast, ref, is_constant_node
+from ..resolver.binding import Binding
+from .util import insert
 
 
-def replace(old_node, new_node):
-    parent = get_parent(old_node)
-    set_parent(new_node, parent)
+def replace(old_node: ast.AST, new_node: ast.AST):
+    parent = ref(old_node).parent
+    ref(new_node).parent = parent
     new_node.specs = old_node.specs
 
     for field, old_value in ast.iter_fields(parent):
@@ -254,5 +250,5 @@ class HoistLiterals(NodeVisitor):
         return self.generic_visit(node)
 
 
-def rename_literals(module):
+def hoist_literals(module):
     HoistLiterals()(module)

@@ -5,14 +5,14 @@ class Reporter:
     def __call__(self, message):
         return BaseStepContext()
 
+    def init(self, len):
+        pass
+
     def range(self, i, message):
         return IterableStep(range(i))
 
 
 class BaseReporter(Reporter):
-    def init(self, len):
-        pass
-
     def iter(self, iterable, message):
         from .tasks.context import IterableTaskContext
         return IterableTaskContext(iterable)

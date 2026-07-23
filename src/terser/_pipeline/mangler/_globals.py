@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 from terser.ast import ast, ref
 from ..resolver.binding import ImportBinding
-from .renamer import NameAssigner, add_assigned
+from ._locals import NameAssigner, add_assigned
 
 if TYPE_CHECKING:
     from terser.ast import ModuleRef

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from ._pipeline import preprocessor, parser, resolver, transforms
+from ._pipeline import preprocessor, parser, resolver, transforms, mangler
 from .ast import ast
 
 if TYPE_CHECKING:
@@ -21,6 +21,8 @@ def minify(
     rename_locals: bool = True,
     preserve_locals: list[str] | None = None,
 ) -> tuple[ast.Module, str | None]:
+    task.init(len=7)
+
     with task("Preprocessing sources"):
         source, shebang = preprocessor.preprocess(source, defines, strict)
 
@@ -49,24 +51,13 @@ def minify(
         if not any(cache.passes.values()):
             break
 
-    # TEMP: mangle
-    """
-    if preserve_locals is None:
-        preserve_locals = []
-    elif isinstance(preserve_locals, str):
-        preserve_locals = [preserve_locals]
+    with task("Mangling"):
+        if hoist_literals:
+            mangler.hoist_literals(module)
 
-    preserve_locals.extend(module.preserved)
+        if rename_locals:
+            mangler.mangle_locals(module, rename_locals, preserve_locals)
 
-    allow_rename_locals(module, rename_locals, preserve_locals)
-
-    if hoist_literals:
-        rename_literals(module)
-
-    rename(module, prefix_globals=not rename_globals, preserved_globals=preserve_globals)
-    """
-
-    # TEMP: apply transform (FLAG <= 2)
     with task("Applying transforms"):
         for transform in transforms.__transforms__:
             if not transform.is_enabled(config) or transform.FLAGS > 2:

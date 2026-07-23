@@ -1,0 +1,57 @@
+## Planned transforms
+
+- Contracts (`contracts.py`) `(Flags.REQUIRES_IMPORT_RESOLVE)`
+    - Default contracts: `typing.cast(_, value) -> value` (leave only `value`), `typing.assert_never(x) -> None` (completely remove call), `typing.assert_type(x, _) -> x` (leave only `x`).
+- Unfold `@lambda _: _()` constants (inline function body)
+- Remove dummy assignments `(Flags.REQUIRES_IMPORT_RESOLVE)`
+- Remove literal statements (`remove_literal_statements.py`) — SHOULD preserve docstrings, will process them right next.
+- Remove docstrings `(param: also_modules)` — preserve docstrings in modules if `not also_modules`. preserve docstrings if decorated with `@terser_hints.preserve_docstring` (can be changed later).
+- Combine imports `combine_imports.py`
+- Cleanup local imports `(Flags.REQUIRES_IMPORT_RESOLVE)` — remove unused local imports, and global imports if `config.respect_all`.
+- Remove annotations `remove_annotations.py`
+- Remove `type` statements
+- Remove typing classes `(Flags.REQUIRES_IMPORT_RESOLVE)`
+    - bare `Protocol` (SHOULD ignore if decorated with `@typing.runtime_visible`)
+    - `NamedTuple`, `NamedDict` (SHOULD convert constructors into `tuple`, `dict`)
+- Remove `Generic`s `(Flags.REQUIRES_IMPORT_RESOLVE)`
+- Remove `@overload`s `(Flags.REQUIRES_IMPORT_RESOLVE)`
+    - Always `True` if `remove-typing-decorators` is selected
+- Remove typing decorators `(Flags.REQUIRES_IMPORT_RESOLVE)`
+    - `@typing.override`
+    - `@typing.final`
+- Remove explicit `return None` `remove_explicit_return_none.py`
+- Remove explicit trailing `return`
+- Fold constants `constant_folding.py`
+    - constant operations
+    - boolean operations (`x ==/is True` → `x`, `x ==/is False` → `not x`, …)
+        - `__debug__`
+        - `typing.TYPE_CHECKING` `(typing)`
+        - `sys.version_info`, `sys.platform` `(module-sensitive)`
+        - numbers (`0b1` → `1`, `1_000_000` → `1e6`, `0.0001` → `1e-4`)
+    - strings (`\uXXXX` → raw represents, `f"{x}"` → `str(x)` or `x`, `f"{x}{y}"` → `x + y`)
+    - collections ( `list()` → `[]`, `dict()` → `{}`, `tuple()` → `()`, `set([1])` → `{1,}` )
+- Convert `typing_extensions` `(Flags.REQUIRES_IMPORT_RESOLVE)`
+- Remove dead blocks
+- Convert early exists
+- Convert to inline
+    - `if cond: func(x)` → `cond and func(x)`
+    - `if fizz: foo(); else: bar()` → `foo() if fizz else bar()`
+- Convert to lambda
+    - `def foo(...): single_expr()` → `foo = lambda ...: single_expr()`
+- Convert dynamic attribute access `(Flags.REQUIRES_IMPORT_RESOLVE)`
+    - `getattr(obj, name)` → `obj.name`, `setattr(obj, name, value)` → `obj.name = value`
+    - SHOULD ignore when:
+        - `name` is not constant
+        - `name` breaks Python naming requirements
+        - `getattr` has default value
+- Remove unnecessary base/meta classes `remove_object_base.py` `(Flags.REQUIRES_MODULE_RESOLVE)`
+    - Default remove: `object`
+- Remove empty exception brackets `remove_exception_brackets.py` `(Flags.REQUIRES_MODULE_RESOLVE)`
+- `[EXPERIMENTAL]` Inline functions
+- `[EXPERIMENTAL]` Inline `enum.IntFlag`s
+- Convert pass `remove_pass.py`
+
+### After mangling
+
+- Convert positional arguments `remove_posargs.py` `(Flags.INFLUENCES_MANGLING)`
+- Remove `__all__` `(Flags.INFLUENCES_MANGLING)`

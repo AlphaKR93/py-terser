@@ -5,7 +5,7 @@ from anyio import Path
 from alpha93.progression import HeadlessReporter
 
 from ._minify import minify, unparse
-from ._pipeline import PathProvider, Pipeline, linker, mangler, transforms
+from ._pipeline import PathProvider, Pipeline, linker, mangler, transforms, tree_shake
 from ._pipeline.mangler.util import preserved_names
 from .ast import ref
 
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
     from alpha93.progression import BaseReporter
 
+    from .ast import ModuleRef
     from .config import TransformConfig
 
 
@@ -30,8 +31,13 @@ class ProjectMinifier(Pipeline):
         preserve_locals: dict[str, list[str]] | None = None,
         rename_globals: bool = False,
         preserve_globals: dict[str, list[str]] | None = None,
+        rename_modules: bool = False,
+        preserve_modules: set[str] | None = None,
+        entry: set[str] | None = None,
     ):
         assert path_provider.is_resolved, "paths are not resolved yet"
+        assert not (rename_modules and output is None), \
+            "rename_modules requires a separate output directory - it would otherwise leave the renamed file's old copy behind"
 
         self.__pp = path_provider
         self.config = config
@@ -43,6 +49,9 @@ class ProjectMinifier(Pipeline):
         self.preserve_locals = preserve_locals or {}
         self.rename_globals = rename_globals
         self.preserve_globals = preserve_globals or {}
+        self.rename_modules = rename_modules
+        self.preserve_modules = preserve_modules or set()
+        self.entry = entry or set()
 
     @classmethod
     async def minify(
@@ -58,9 +67,12 @@ class ProjectMinifier(Pipeline):
         preserve_locals: dict[str, list[str]] | None = None,
         rename_globals: bool = False,
         preserve_globals: dict[str, list[str]] | None = None,
+        rename_modules: bool = False,
+        preserve_modules: set[str] | None = None,
+        entry: set[str] | None = None,
     ):
         reporter = reporter or HeadlessReporter()
-        reporter.init(len=7)
+        reporter.init(len=9)
 
         with reporter("Resolving paths"):
             pp = PathProvider(paths)
@@ -73,6 +85,9 @@ class ProjectMinifier(Pipeline):
             preserve_locals=preserve_locals,
             rename_globals=rename_globals,
             preserve_globals=preserve_globals,
+            rename_modules=rename_modules,
+            preserve_modules=preserve_modules,
+            entry=entry,
         )()
 
     async def __minify_module(self, task, spec) -> ast.Module:
@@ -110,6 +125,14 @@ class ProjectMinifier(Pipeline):
         for _, module in self.reporter.iter(collected, "Linking"):
             linker.link(module, project)
 
+        with self.reporter("Tree-shaking"):
+            entry = await self.__resolve_entry(project)
+            project = tree_shake.shake(project, entry)
+            collected = {module_ref.ast for module_ref in project.values()}
+
+        with self.reporter("Mangling modules"):
+            new_dotted = mangler.mangle_modules(project, self.rename_modules, self.preserve_modules, entry)
+
         cache = transforms.TransformCache(self.config)
         for _ in self.reporter.range(self.config.passes, "Applying transforms"):
             for module in collected:
@@ -133,17 +156,33 @@ class ProjectMinifier(Pipeline):
                 module: ast.Module = transform(cache)(module)
 
         with self.reporter("Writing output"):
-            await asyncio.gather(*(self.__dump_module(module) for module in collected))
+            await asyncio.gather(*(self.__dump_module(module, new_dotted) for module in collected))
 
-    async def __dump_module(self, module: ast.Module):
+    async def __resolve_entry(self, project: dict[str, ModuleRef]) -> set[str]:
+        """Resolve `self.entry` (dotted module paths or file paths) against `project`'s modules."""
+
+        resolved: set[str] = set()
+        for value in self.entry:
+            if value in project:
+                resolved.add(value)
+                continue
+
+            candidate = await Path(value).resolve()
+            for dotted, module_ref in project.items():
+                if module_ref.spec.path == candidate:
+                    resolved.add(dotted)
+                    break
+
+        return resolved
+
+    async def __dump_module(self, module: ast.Module, new_dotted: dict[str, str]):
         spec = ref(module).spec
 
         if self.output is None:
             # in-place: write each module back to its own original file
             dest = spec.path
         else:
-            root = self.__pp.root_for(spec)
-            dest = self.output / (spec.path.relative_to(root) if root else spec.path.name)
+            dest = self.output / mangler.module_output_path(spec, new_dotted)
             await dest.parent.mkdir(parents=True, exist_ok=True)
 
         await dest.write_text(unparse(str(spec.path), None, module))

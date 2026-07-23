@@ -14,11 +14,35 @@ _config = ConfigDict(use_attribute_docstrings=True)
 PydanticTransformOptions = dataclasses.to_model(TransformConfig)
 
 
+def parse_preserve(args: set[str]) -> dict[str, list[str]]:
+    """
+    Parse `--preserve-locals`/`--preserve-globals` values into a glob-pattern -> names map.
+
+    Each argument is either "name[,name...]" (applies to every module, pattern "*") or
+    "pattern:name[,name...]" (applies only to modules whose dotted path, or filename in
+    single-file mode, matches the glob pattern), e.g. "foo.bar:baz,qux".
+    """
+
+    result: dict[str, list[str]] = {}
+    for arg in args:
+        pattern, sep, names = arg.partition(':')
+        if not sep:
+            pattern, names = '*', pattern
+        pattern = pattern.strip() or '*'
+
+        for name in names.split(','):
+            name = name.strip()
+            if name:
+                result.setdefault(pattern, []).append(name)
+
+    return result
+
+
 class OutputOptions(BaseModel):
     model_config = _config
 
-    output: str | None = "stdout"
-    """Path to write minified output."""
+    output: str | None = None
+    """Path to write minified output. Defaults to stdout."""
 
     in_place: bool = False
     """Overwrite existing files."""
@@ -34,13 +58,15 @@ class ManglingOptions(BaseModel):
     """Mangle local (including nonlocal) names"""
 
     preserve_locals: Annotated[set[str], Field(default_factory=set)]
-    """Comma-separated list of local name references that will not be mangled"""
+    """Comma-separated list of local names that will not be mangled. Prefix with a
+    glob pattern and ':' to scope to matching modules, e.g. 'foo.bar:baz,qux'"""
 
     rename_globals: bool = False
-    """Mangle global names"""
+    """Mangle global names (requires --in-place, since this needs whole-project linking)"""
 
     preserve_globals: Annotated[set[str], Field(default_factory=set)]
-    """Comma-separated list of global name references that will not be mangled"""
+    """Comma-separated list of global names that will not be mangled. Prefix with a
+    glob pattern and ':' to scope to matching modules, e.g. 'foo.bar:baz,qux'"""
 
 
 class TerserArguments(BaseModel):
@@ -79,13 +105,11 @@ class TerserParsedArguments(TerserArguments):
             remove_argument_annotations=namespace.remove_argument_annotations,
             remove_attribute_annotations=namespace.remove_attribute_annotations,
         )
-        if namespace.remove_annotations and not all(remove_annotations.__dict__.values()):
-            raise ValueError
         transform_options = TransformConfig(
             optimize=namespace.optimize,
             remove_literal_statements=namespace.remove_literal_statements,
             combine_imports=namespace.combine_imports,
-            remove_annotations=namespace.remove_annotations or remove_annotations,
+            remove_annotations=remove_annotations if namespace.remove_annotations else False,
             remove_explicit_base=namespace.remove_explicit_base,
             remove_explicit_return_none=namespace.remove_explicit_return_none,
             fold_constants=namespace.fold_constants,

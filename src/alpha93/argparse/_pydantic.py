@@ -1,10 +1,9 @@
 import argparse
 import typing
-from collections.abc import Iterable
 from dataclasses import is_dataclass
 from enum import EnumType
 from types import UnionType
-from typing import TYPE_CHECKING, Any, Annotated, get_args, override
+from typing import TYPE_CHECKING, Any, Annotated, get_args, get_origin, override
 
 from alpha93.commons.pydantic import dataclasses
 from pydantic import BaseModel
@@ -96,17 +95,25 @@ class _ModelArgumentBuilder:
                 choices = None
 
         action, nargs = "store", None
-        if isinstance(model, Iterable):
-            action, nargs = "append", '+'
+        if get_origin(model) in (list, set, frozenset, tuple):
+            # 'extend' (not 'append') so repeated uses of the flag accumulate into a
+            # flat list matching the field's collection type, instead of a list of lists.
+            action, nargs = "extend", '+'
+            # argparse's `type=` converts each individual token, so it needs the
+            # collection's element type (e.g. `str`), not the collection type itself
+            # (calling `set[str]("foo")` would build a set of its characters).
+            elem_types = get_args(model)
+            model = elem_types[0] if elem_types else str
 
         if isinstance(model, UnionType):
             model = None
 
+        default = [] if action == "extend" else field_info.get_default(call_default_factory=True)
         parser.add_argument(
             "--" + field.replace('_', '-'),
             action=action,
             nargs=nargs,
-            default=field_info.default,
+            default=default,
             type=model, # type: ignore[invalid-type]
             choices=choices,
             required=field_info.is_required(),

@@ -21,7 +21,7 @@ dev = [
 ]
 
 [project.scripts]
-terser = "python_minifier.cli:main"
+terser = "terser.cli:main"
 
 [build-system]
 requires = ["hatchling"]

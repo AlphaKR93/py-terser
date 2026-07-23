@@ -1,25 +1,17 @@
-import fnmatch
 from typing import TYPE_CHECKING
 
 from terser.ast import ast, ref
 from ..resolver.binding import ImportBinding
 from ._locals import NameAssigner, add_assigned
+from .util import preserved_names
 
 if TYPE_CHECKING:
     from terser.ast import ModuleRef
 
 
-def _preserved_names(module_path: str, preserved: dict[str, list[str]]) -> set[str]:
-    names = set()
-    for pattern, pattern_names in preserved.items():
-        if fnmatch.fnmatch(module_path, pattern):
-            names.update(pattern_names)
-    return names
-
-
 def _disallow(project: dict[str, ModuleRef], rename_globals: bool, preserved: dict[str, list[str]]):
     for module_path, module_ref in project.items():
-        preserve = _preserved_names(module_path, preserved)
+        preserve = preserved_names(module_path, preserved)
 
         for binding in module_ref.bindings:
             if not rename_globals or binding.name in preserve:

@@ -1,4 +1,22 @@
+import fnmatch
+
 from terser.ast import ast, is_constant_node, is_scoped, ref
+
+
+def preserved_names(module_path: str, preserved: dict[str, list[str]]) -> set[str]:
+    """
+    Names to leave unchanged for a given module.
+
+    :param module_path: The module's dotted path (or filename, for non-project usage)
+    :param preserved: Names to leave unchanged, keyed by a glob pattern matched against
+        ``module_path`` (e.g. ``{"foo.bar": ["baz"], "*": ["qux"]}``)
+    """
+
+    names = set()
+    for pattern, pattern_names in preserved.items():
+        if fnmatch.fnmatch(module_path, pattern):
+            names.update(pattern_names)
+    return names
 
 
 def get_global_namespace(node: ast.AST):

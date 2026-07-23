@@ -21,6 +21,22 @@ def resolve(module: ast.Module):
     NameResolver()(module)
 
 
+def resolve_subtree(node: ast.AST, module_ref: "ModuleRef"):
+    """
+    Bind names to their local namespace within a subtree added after the initial resolve pass
+
+    Unlike `resolve`, this does not walk from an `ast.Module` - `node`'s namespace/parent refs
+    must already be set (see `SuiteTransformer.add_child`).
+
+    :param node: The subtree root
+    :param module_ref: The module `node` belongs to
+    """
+
+    name_resolver = NameResolver()
+    name_resolver.module_ref = module_ref
+    name_resolver.visit(node)
+
+
 class NameResolver(NodeVisitor):
     """
     Create a NameBinding for each name that is bound

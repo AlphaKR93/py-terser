@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from terser.ast import ModuleRef, ast, ref
 from ..binding import Binding, BuiltinBinding, UnresolvedBinding
 from ..util import scope_ref_global, scope_ref_nonlocal
+from ...parser._scope import ScopeResolver
 
 if TYPE_CHECKING:
     from terser.ast.ref import ScopedNode
@@ -54,10 +55,7 @@ def bind(node: ast.AST):
 
     :param node: The node to resolve names in
     """
-    try:
-        namespace = ref(node).namespace
-    except AttributeError:
-        namespace = ref(node).namespace
+    namespace = ref(node).namespace
     namespace_ref = ref(namespace)
 
     if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):

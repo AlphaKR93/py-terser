@@ -31,6 +31,7 @@ class Contracts(SuiteTransformer):
     @override
     def visit_Call(self, node: ast.Call):
         node: ast.Call = self.generic_visit(node)
+        node_ref = ref(node)
 
         if not isinstance(func := node.func, ast.Name):
             return node
@@ -52,7 +53,6 @@ class Contracts(SuiteTransformer):
             del name1
 
         if not contract.convert_to:
-            node_ref = ref(node)
             return self.add_child(ast.Constant(value=None), parent=node_ref.parent, namespace=node_ref.namespace)
 
         assert isinstance(contract.args, list)
@@ -64,4 +64,4 @@ class Contracts(SuiteTransformer):
 
             preserved[name] = node.args[i]
 
-        return contract.convert(**preserved)
+        return self.add_child(contract.convert(**preserved), parent=node_ref.parent, namespace=node_ref.namespace)

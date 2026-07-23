@@ -1,8 +1,7 @@
 from typing import TYPE_CHECKING
 
-from terser.exceptions import InvalidTransformError
 from ._pipeline import preprocessor, parser, resolver, transforms
-from .ast import ast, compare_ast
+from .ast import ast
 
 if TYPE_CHECKING:
     from alpha93.progression import Task

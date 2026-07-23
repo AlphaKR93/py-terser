@@ -1,9 +1,10 @@
 import asyncio
 from typing import TYPE_CHECKING
 
+from anyio import Path
 from alpha93.progression import HeadlessReporter
 
-from ._minify import minify
+from ._minify import minify, unparse
 from ._pipeline import PathProvider, Pipeline, linker, mangler, transforms
 from .ast import ref
 
@@ -16,23 +17,37 @@ if TYPE_CHECKING:
 
 
 class ProjectMinifier(Pipeline):
-    def __init__(self, path_provider: PathProvider, config: TransformConfig, reporter: BaseReporter):
+    def __init__(
+        self,
+        path_provider: PathProvider,
+        config: TransformConfig,
+        reporter: BaseReporter,
+        output: str | Path,
+    ):
         assert path_provider.is_resolved, "paths are not resolved yet"
 
         self.__pp = path_provider
         self.config = config
         self.reporter = reporter or HeadlessReporter()
+        self.output: Path = Path(output)
 
     @classmethod
-    async def minify(cls, paths: set[str], config: TransformConfig, reporter: BaseReporter | None = None, /):
+    async def minify(
+        cls,
+        paths: set[str],
+        config: TransformConfig,
+        output: str | Path,
+        reporter: BaseReporter | None = None,
+        /,
+    ):
         reporter = reporter or HeadlessReporter()
-        reporter.init(len=6)
+        reporter.init(len=7)
 
         with reporter("Resolving paths"):
             pp = PathProvider(paths)
             await pp.resolve()
 
-        await cls(pp, config, reporter)()
+        await cls(pp, config, reporter, output)()
 
     async def __minify_module(self, task, spec) -> ast.Module:
         source = await spec.path.read_text()
@@ -74,3 +89,16 @@ class ProjectMinifier(Pipeline):
                     continue
 
                 module: ast.Module = transform(cache)(module)
+
+        if self.output is not None:
+            with self.reporter("Writing output"):
+                await asyncio.gather(*(self.__dump_module(module) for module in collected))
+
+    async def __dump_module(self, module: ast.Module):
+        spec = ref(module).spec
+
+        root = self.__pp.root_for(spec)
+        dest = self.output / (spec.path.relative_to(root) if root else spec.path.name)
+
+        await dest.parent.mkdir(parents=True, exist_ok=True)
+        await dest.write_text(unparse(str(spec.path), None, module))

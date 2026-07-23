@@ -22,3 +22,7 @@ class InvalidTransformError(RuntimeError):
 
     def __str__(self):
         return 'Minification was unstable! Please create an issue at https://github.com/dflook/python-minifier/issues'
+
+class UnbeneficialMinificationError(Exception):
+    """Raised when minification results in larger output than the original."""
+    pass

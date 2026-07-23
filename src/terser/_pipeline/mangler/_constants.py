@@ -1,12 +1,13 @@
 from terser.ast import NodeVisitor, ast, ref, is_constant_node
+from terser.ast.ref._node import NodeRef
 from ..resolver.binding import Binding
 from .util import insert
 
 
 def replace(old_node: ast.AST, new_node: ast.AST):
     parent = ref(old_node).parent
-    ref(new_node).parent = parent
-    new_node.specs = old_node.specs
+    NodeRef.new(new_node, parent)
+    ref(new_node).namespace = ref(old_node).namespace
 
     for field, old_value in ast.iter_fields(parent):
         if old_value is old_node:
@@ -130,9 +131,10 @@ class HoistLiterals(NodeVisitor):
 
         """
 
-        if isinstance(node.specs, (ast.FunctionDef, ast.Module, ast.AsyncFunctionDef)):
-            return node.specs
-        return self.nearest_function_namespace(node.specs)
+        namespace = ref(node).namespace
+        if isinstance(namespace, (ast.FunctionDef, ast.Module, ast.AsyncFunctionDef)):
+            return namespace
+        return self.nearest_function_namespace(namespace)
 
     def namespace_path(self, node):
         """
@@ -185,7 +187,7 @@ class HoistLiterals(NodeVisitor):
                 else:
                     namespace_path = self.common_path(namespace_path, self.namespace_path(node))
 
-            namespace_path[-1].bindings.append(binding)
+            ref(namespace_path[-1]).bindings.append(binding)
             binding.set_local_namespace(namespace_path[-1])
 
     def get_binding(self, value, node):
@@ -199,7 +201,7 @@ class HoistLiterals(NodeVisitor):
 
     def visit_Str(self, node):
 
-        if isinstance(get_parent(node), ast.Expr):
+        if isinstance(ref(node).parent, ast.Expr):
             # This is literal statement
             # The RemoveLiteralStatements transformer must have left it here, so ignore it.
             return
@@ -239,7 +241,7 @@ class HoistLiterals(NodeVisitor):
         if not self._ignore_slots:
             return self.generic_visit(node)
 
-        if not isinstance(node.namespace, ast.ClassDef):
+        if not isinstance(ref(node).namespace, ast.ClassDef):
             return self.generic_visit(node)
 
         for target in node.targets:

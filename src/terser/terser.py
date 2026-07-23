@@ -1,48 +1,9 @@
-from .ast import CompareError, ast, compare_ast, DummySpec
+from alpha93.progression.tasks import Task
 
-from .exceptions import InvalidTransformError
-from terser._pipeline.printer.module_printer import ModulePrinter
-# from terser._pipeline.mangler import (
-#     allow_rename_globals,
-#     allow_rename_locals,
-#     rename,
-#     rename_literals,
-# )
-
-from ._minify import minify as __minify
+from ._minify import minify as __minify, unparse as __unparse
+from ._pipeline import transforms
+from .ast import DummySpec, ast
 from .config import TransformConfig
-
-
-def unparse(
-    path: str,
-    source: str | None,
-    module: ast.Module,
-    prefer_single_line: bool = False
-) -> str:
-    """
-    Turn a module AST into python code
-
-    This returns an exact representation of the given module,
-    such that it can be parsed back into the same AST.
-
-    :param ast.Module module: The module to turn into python code
-    :param bool prefer_single_line: If semi-colons should be preferred over newlines where there is no difference in output size
-    :rtype: str
-    """
-    printer = ModulePrinter(prefer_single_line=prefer_single_line)
-    printer(module)
-
-    try:
-        minified_module = ast.parse(printer.code, 'terser.unparse output')
-    except SyntaxError as syntax_error:
-        raise InvalidTransformError(syntax_error, path, source, module)
-
-    try:
-        compare_ast(module, minified_module)
-    except CompareError as compare_error:
-        raise InvalidTransformError(compare_error, path, source, minified_module)
-
-    return printer.code
 
 
 def minify(
@@ -50,8 +11,6 @@ def minify(
     config: TransformConfig,
     path: str = "<unknown>",
     /,
-    rename_globals=False,
-    preserve_globals=None,
     preserve_shebang=True,
     prefer_single_line=False,
     **kwargs,
@@ -80,7 +39,18 @@ def minify(
 
     :rtype: str
     """
-    module, shebang = __minify(source, DummySpec(path), config, **kwargs)
+    module, shebang = __minify(Task(), source, DummySpec(path), config, **kwargs)
 
-    minified = unparse(path, source, module, prefer_single_line=prefer_single_line)
+    cache = transforms.TransformCache(config)
+    for _ in range(config.passes):
+        for transform in transforms.__transforms__:
+            if not transform.is_enabled(config) or transform.FLAGS > 4:
+                continue
+
+            module: ast.Module = transform(cache)(module)
+
+        if not any(cache.passes.values()):
+            break
+
+    minified = __unparse(path, source, module, prefer_single_line=prefer_single_line)
     return (shebang + '\n' + minified) if preserve_shebang and shebang else minified

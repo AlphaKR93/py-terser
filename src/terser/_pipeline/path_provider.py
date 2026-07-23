@@ -137,16 +137,30 @@ class PathProvider(MutableSet[str]):
 
     __specs: dict[str, spec.ModuleSpec]
     __iter: set[spec.ModuleSpec]
+    __roots: set[Path]
 
     def __init__(self, paths: set[str]):
         self.__specs = {}
         self.__iter = set()
         self.__queue = set() | paths
         self.__discarded = set()
+        self.__roots = set()
 
     @property
     def specs(self):
         return self.__specs
+
+    @property
+    def roots(self) -> set[Path]:
+        """Resolved absolute directory roots that were walked to build the specs."""
+        return self.__roots
+
+    def root_for(self, module: spec.ModuleSpec) -> Path | None:
+        """The directory root a module's file was found under, if any."""
+        for root in self.__roots:
+            if module.path.is_relative_to(root):
+                return root
+        return None
 
     @property
     def is_resolved(self) -> bool:
@@ -179,6 +193,7 @@ class PathProvider(MutableSet[str]):
                 continue
 
             ns.register(path)
+            self.__roots.add(path)
             async for root, _, children in path.walk(follow_symlinks=not strict):
                 for child in children:
                     path_ = root / child

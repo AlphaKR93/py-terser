@@ -1,12 +1,49 @@
 from typing import TYPE_CHECKING
 
 from ._pipeline import preprocessor, parser, resolver, transforms, mangler
-from .ast import ast
+from ._pipeline.printer import ModulePrinter
+from .ast import CompareError, ast, compare_ast
+from .exceptions import InvalidTransformError, UnbeneficialMinificationError
 
 if TYPE_CHECKING:
     from alpha93.progression import Task
     from .ast.ref import ModuleSpec
     from .config import TransformConfig
+
+
+def unparse(
+    path: str,
+    source: str | None,
+    module: ast.Module,
+    prefer_single_line: bool = False
+) -> str:
+    """
+    Turn a module AST into python code
+
+    This returns an exact representation of the given module,
+    such that it can be parsed back into the same AST.
+
+    :param ast.Module module: The module to turn into python code
+    :param bool prefer_single_line: If semi-colons should be preferred over newlines where there is no difference in output size
+    :rtype: str
+    """
+    printer = ModulePrinter(prefer_single_line=prefer_single_line)
+    printer(module)
+
+    try:
+        minified_module = ast.parse(printer.code, "<terser.unparse output>")
+    except SyntaxError as syntax_error:
+        raise InvalidTransformError(syntax_error, path, source, module)
+
+    if source and len(printer.code) >= len(source):
+        raise UnbeneficialMinificationError()
+
+    try:
+        compare_ast(module, minified_module)
+    except CompareError as compare_error:
+        raise InvalidTransformError(compare_error, path, source, minified_module)
+
+    return printer.code
 
 
 def minify(

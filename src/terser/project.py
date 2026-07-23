@@ -1,4 +1,5 @@
 import asyncio
+import shutil
 from typing import TYPE_CHECKING
 
 from anyio import Path
@@ -133,7 +134,24 @@ class ProjectMinifier(Pipeline):
                 module: ast.Module = transform(cache)(module)
 
         with self.reporter("Writing output"):
-            await asyncio.gather(*(self.__dump_module(module) for module in collected))
+            tasks = [self.__dump_module(module) for module in collected]
+            if self.output is not None:
+                tasks.extend(self.__copy_ffi_file(ffi_path) for ffi_path in self.__pp.ffi_files)
+            await asyncio.gather(*tasks)
+
+    async def __copy_ffi_file(self, ffi_path: Path):
+        if self.output is None:
+            return
+
+        root = None
+        for r in self.__pp.roots:
+            if ffi_path.is_relative_to(r):
+                root = r
+                break
+
+        dest = self.output / (ffi_path.relative_to(root) if root else ffi_path.name)
+        await dest.parent.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(shutil.copy2, str(ffi_path), str(dest))
 
     async def __dump_module(self, module: ast.Module):
         spec = ref(module).spec

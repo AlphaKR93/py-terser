@@ -87,11 +87,21 @@ class ProjectMinifier(Pipeline):
         return module
 
     async def __minify_modules(self) -> list[ast.Module]:
-        tasks = [
-            self.__minify_module(task, spec)
+        pairs = [
+            (task, spec)
             async for task, spec in self.reporter.aiter(self.__pp.iter(), "Parsing modules")
         ]
-        return await asyncio.gather(*tasks)
+        total = len(pairs) or 1
+        done = 0
+
+        async def run(task, spec) -> ast.Module:
+            nonlocal done
+            module = await self.__minify_module(task, spec)
+            done += 1
+            self.reporter.progress(done / total)
+            return module
+
+        return await asyncio.gather(*(run(task, spec) for task, spec in pairs))
 
     async def __call__(self, /):
         collected = set(await self.__minify_modules())

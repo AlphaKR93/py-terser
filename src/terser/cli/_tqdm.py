@@ -26,7 +26,11 @@ class TqdmReporter(BaseReporter):
 
     def init(self, len):
         self._total = len
-        self._bar = tqdm(total=len, leave=True)
+        self._bar = tqdm(total=100, unit="%", leave=True)
+
+    def _set_n(self, phases_done: float):
+        self._bar.n = round(100 * phases_done / self._total)
+        self._bar.refresh()
 
     def _enter_phase(self, message) -> bool:
         """Advance to the next phase; returns True if this is the last one."""
@@ -35,21 +39,22 @@ class TqdmReporter(BaseReporter):
             return False
 
         self._bar.set_description(message)
-        self._bar.n = self._phase
-        self._bar.refresh()
+        self._set_n(self._phase)
         self._phase += 1
         return self._phase >= self._total
 
     def _set_fraction(self, fraction: float):
         if self._bar is None:
             return
-        self._bar.n = (self._phase - 1) + fraction
-        self._bar.refresh()
+        self._set_n((self._phase - 1) + fraction)
+
+    def progress(self, fraction: float):
+        self._set_fraction(fraction)
 
     def _finish(self):
         if self._bar is None:
             return
-        self._bar.n = self._total
+        self._bar.n = 100
         self._bar.refresh()
         self._bar.close()
         self._bar = None

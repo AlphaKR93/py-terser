@@ -11,6 +11,9 @@ class Reporter:
     def range(self, i, message):
         return IterableStep(range(i))
 
+    def progress(self, fraction: float):
+        pass
+
 
 class BaseReporter(Reporter):
     def iter(self, iterable, message):

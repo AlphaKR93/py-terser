@@ -106,7 +106,7 @@ class RemoveAnnotations(SuiteTransformer):
         # is this a class attribute or a variable?
         node_ref = ref(node)
         if isinstance(node_ref.parent, ast.ClassDef):
-            if not self._options.remove_variable_annotations:
+            if not self._options.remove_attribute_annotations:
                 return node
         else:
             if not self._options.remove_variable_annotations:

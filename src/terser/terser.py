@@ -4,7 +4,10 @@ from ._minify import minify as __minify, unparse as __unparse
 from ._pipeline import transforms
 from .ast import DummySpec, ast
 from .config import TransformConfig
+from .project import ProjectMinifier
 
+
+minify_project = ProjectMinifier.minify
 
 def minify(
     source: str,

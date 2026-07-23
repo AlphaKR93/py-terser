@@ -31,8 +31,7 @@ class Contract:
             return ast.Constant(value=None)
 
         convert_to = ast.parse(self.convert_to, mode="eval").body
-        NodeReplacer(kwargs).visit(convert_to)
-        return convert_to
+        return NodeReplacer(kwargs).visit(convert_to)
 
 
 def __parse_name(node: ast.expr, /) -> str:

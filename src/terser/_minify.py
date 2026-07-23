@@ -5,11 +5,13 @@ from ._pipeline import preprocessor, parser, resolver, transforms
 from .ast import ast
 
 if TYPE_CHECKING:
+    from alpha93.progression import Task
     from .ast.ref import ModuleSpec
     from .config import TransformConfig
 
 
-async def minify(
+def minify(
+    task: Task,
     source: str,
     spec: ModuleSpec | str,
     config: TransformConfig,
@@ -20,31 +22,33 @@ async def minify(
     rename_locals: bool = True,
     preserve_locals: list[str] | None = None,
 ) -> tuple[ast.Module, str | None]:
-    # TEMP: preprocess
-    source, shebang = preprocessor.preprocess(source, defines, strict)
+    with task("Preprocessing sources"):
+        source, shebang = preprocessor.preprocess(source, defines, strict)
 
-    # TEMP: parse
-    module, module_ref = parser.parse(source, spec)
+    with task("Parsing AST"):
+        module = parser.parse(source, spec)
 
-    # TEMP: apply transform (FLAG == 0)
-    for transform in transforms.__transforms__:
-        if not transform.is_enabled(config) or transform.FLAGS > 0:
-            continue
+    with task("Applying transforms"):
+        for transform in transforms.__transforms__:
+            if not transform.is_enabled(config) or transform.FLAGS > 0:
+                continue
 
-        module: ast.Module = transform(config)(module)
+            module: ast.Module = transform(config)(module)
 
-    # TEMP: resolve
-    resolver.resolve(module)
-    resolver.bind(module)
+    with task("Resolving names"):
+        resolver.resolve(module)
+        resolver.bind(module)
 
-    # TEMP: apply transform (FLAG <= 1)
     cache = transforms.TransformCache(config)
-    for _ in range(config.passes):
+    for _ in task.range(config.passes, "Applying transforms"):
         for transform in transforms.__transforms__:
             if not transform.is_enabled(config) or transform.FLAGS > 1:
                 continue
 
             module: ast.Module = transform(cache)(module)
+
+        if not any(cache.passes.values()):
+            break
 
     # TEMP: mangle
     """
@@ -64,13 +68,12 @@ async def minify(
     """
 
     # TEMP: apply transform (FLAG <= 2)
-    cache = transforms.TransformCache(config)
-    for _ in range(config.passes):
+    with task("Applying transforms"):
         for transform in transforms.__transforms__:
             if not transform.is_enabled(config) or transform.FLAGS > 2:
                 continue
 
-            module: ast.Module = transform(cache)(module)
+            module: ast.Module = transform(config)(module)
 
     try:
         module = ast.parse(module)

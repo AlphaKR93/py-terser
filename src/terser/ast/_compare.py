@@ -21,12 +21,12 @@ class CompareError(RuntimeError):
 
     def namespace(self, node):
         if hasattr(node, 'namespace'):
-            if isinstance(node.namespace, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
-                return self.namespace(node.namespace) + '.' + node.namespace.name
-            elif isinstance(node.namespace, ast.Module):
+            if isinstance(node.specs, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)):
+                return self.namespace(node.specs) + '.' + node.specs.name
+            elif isinstance(node.specs, ast.Module):
                 return ''
             else:
-                return repr(node.namespace.__class__)
+                return repr(node.specs.__class__)
 
         return None
 

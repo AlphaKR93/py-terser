@@ -1,4 +1,4 @@
-from terser.ast import ast, is_constant_node
+from terser.ast import ast, is_constant_node, is_scoped, ref
 
 
 def get_global_namespace(node: ast.AST):
@@ -9,10 +9,11 @@ def get_global_namespace(node: ast.AST):
 
     """
 
-    if node.namespace is node:
+    namespace = ref(node).namespace
+    if namespace is node:
         return node
 
-    return get_global_namespace(node.namespace)
+    return get_global_namespace(namespace)
 
 
 def get_nonlocal_namespace(node: ast.AST):
@@ -22,10 +23,11 @@ def get_nonlocal_namespace(node: ast.AST):
     The nonlocal namespace is the closest parent function scope's namespace.
     """
 
-    if isinstance(node.namespace, ast.ClassDef):
-        return get_nonlocal_namespace(node.namespace)
+    namespace = ref(node).namespace
+    if isinstance(namespace, ast.ClassDef):
+        return get_nonlocal_namespace(namespace)
 
-    return node.namespace
+    return namespace
 
 
 def arg_rename_in_place(node: ast.AST):
@@ -48,23 +50,24 @@ def arg_rename_in_place(node: ast.AST):
 
     """
 
-    func = node.namespace
+    func = ref(node).namespace
 
     if isinstance(func, ast.comprehension):
         return True
 
-    if isinstance(func.namespace, ast.ClassDef) and not isinstance(func, ast.Lambda):
+    func_namespace = ref(func).namespace
+    if isinstance(func_namespace, ast.ClassDef) and not isinstance(func, ast.Lambda):
         all_args = (func.args.posonlyargs if hasattr(func.args, 'posonlyargs') else []) + func.args.args
         if len(all_args) > 0 and node is all_args[0]:
             if len(func.decorator_list) == 0:
-                # mangler 'self'
+                # mangle 'self'
                 return True
             elif (
                 len(func.decorator_list) == 1
                 and isinstance(func.decorator_list[0], ast.Name)
                 and func.decorator_list[0].id == 'classmethod'
             ):
-                # mangler 'cls'
+                # mangle 'cls'
                 return True
 
     if func.args.vararg is node or func.args.kwarg is node:
@@ -112,8 +115,8 @@ def allow_rename_locals(node, rename_locals, preserve_locals=None):
     if preserve_locals is None:
         preserve_locals = []
 
-    if not isinstance(node, ast.Module) and is_namespace(node):
-        for binding in node.bindings:
+    if not isinstance(node, ast.Module) and is_scoped(node):
+        for binding in ref(node).bindings:
             if rename_locals is False:
                 binding.disallow_rename()
             elif binding.name in preserve_locals:
@@ -121,15 +124,3 @@ def allow_rename_locals(node, rename_locals, preserve_locals=None):
 
     for child in ast.iter_child_nodes(node):
         allow_rename_locals(child, rename_locals, preserve_locals)
-
-
-def allow_rename_globals(module, rename_globals=False, preserve_globals=None):
-
-    if preserve_globals is None:
-        preserve_globals = []
-
-    preserve_globals.extend(find__all__(module))
-
-    for binding in module.bindings:
-        if rename_globals is False or binding.name in preserve_globals:
-            binding.disallow_rename()

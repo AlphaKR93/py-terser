@@ -1,21 +1,22 @@
-from terser.ast import ast
-from ..parser import is_scoped, ref
+from terser.ast import ast, is_scoped, ref
 
+from ..resolver.binding import NameBinding
 from .name_generator import name_filter
+from .util import allow_rename_locals
 
 
 def all_bindings(node):
     """
-    All bindings in a module
+    All bindings in a namespace tree
 
-    :param node: The module to get bindings in
+    :param node: The root node to get bindings in
     :type node: :class:`ast.AST`
     :rtype: Iterable[ast.AST, Binding]
 
     """
 
     if is_scoped(node):
-        for binding in node.bindings:
+        for binding in ref(node).bindings:
             yield node, binding
 
     for child in ast.iter_child_nodes(node):
@@ -25,9 +26,9 @@ def all_bindings(node):
 
 def sorted_bindings(module):
     """
-    All bindings in a modules sorted by descending number of references
+    All bindings in a namespace tree sorted by descending number of references
 
-    :param module: The module to get bindings in
+    :param module: The root node to get bindings in
     :type module: :class:`ast.AST`
     :rtype: Iterable[ast.AST, Binding]
 
@@ -57,24 +58,31 @@ def reservation_scope(namespace, binding):
     namespaces = {namespace}
 
     for node in binding.references:
-        while node is not namespace:
-            namespaces.add(node.namespace)
-            node = node.namespace
+        current = node
+        while current is not namespace:
+            current_namespace = ref(current).namespace
+            namespaces.add(current_namespace)
+            current = current_namespace
 
     return namespaces
 
 
 def add_assigned(node):
     """
-    Add the assigned_names attribute to namespace nodes in a module
+    Add the assigned_names attribute to namespace nodes in a tree, if not already present
 
-    :param node: The module to add the assigned_names attribute to
-    :type node: :class:`ast.Module`
+    Left alone if already set, so a later mangle pass (e.g. project-wide global mangling)
+    doesn't forget the names an earlier pass (e.g. per-module local mangling) already reserved.
+
+    :param node: The root node to add the assigned_names attribute to
+    :type node: :class:`ast.AST`
 
     """
 
     if is_scoped(node):
-        node.assigned_names = set()
+        node_ref = ref(node)
+        if not hasattr(node_ref, 'assigned_names'):
+            node_ref.assigned_names = set()
 
     for child in ast.iter_child_nodes(node):
         add_assigned(child)
@@ -91,7 +99,28 @@ def reserve_name(name, reservation_scope):
     """
 
     for namespace in reservation_scope:
-        namespace.assigned_names.add(name)
+        ref(namespace).assigned_names.add(name)
+
+
+def should_rename(binding, name, scope, is_available):
+    if binding.should_rename(name):
+        return True
+
+    # It's no longer efficient to do this mangle
+
+    if isinstance(binding, NameBinding):
+        # Check that the original name is still available
+
+        if binding.reserved == binding.name:
+            # We already reserved it (this is probably an arg)
+            return False
+
+        if not is_available(binding.name, scope):
+            # The original name has already been assigned to another binding,
+            # so we need to mangle this anyway.
+            return True
+
+    return False
 
 
 class UniqueNameAssigner:
@@ -128,6 +157,10 @@ class NameAssigner:
     namespaces.
 
     Bindings are assigned names in order of most references, with names assigned shortest first.
+
+    A single instance may be reused across multiple, unrelated namespace trees (e.g. every module in a
+    project) - the name cache is shared, but availability is always checked against the binding's own
+    reservation scope, so there's no cross-tree leakage.
 
     """
 
@@ -166,9 +199,36 @@ class NameAssigner:
 
         """
 
-        return all(name not in namespace.assigned_names for namespace in reservation_scope)
+        return all(name not in ref(namespace).assigned_names for namespace in reservation_scope)
 
-    def __call__(self, module, prefix_globals, reserved_globals=None):
+    def assign(self, namespace, binding, *, prefix=''):
+        """
+        Assign a new name to a single binding, in its reservation scope
+
+        Shared by both :func:`mangle_locals` (walking one module's namespace tree) and
+        :func:`terser._pipeline.mangler.global_mangle.mangle_globals` (walking module-level
+        bindings across a whole project).
+
+        :param namespace: The binding's local namespace
+        :param binding: The binding to assign a name to
+        :param str prefix: A prefix to apply to the assigned name (e.g. to avoid colliding
+            with builtins at module level)
+        """
+
+        scope = reservation_scope(namespace, binding)
+
+        if binding.allow_rename:
+            name = self.available_name(scope, prefix=prefix)
+
+            if should_rename(binding, name, scope, self.is_available):
+                binding.rename(name)
+            else:
+                binding.disallow_rename()
+
+        if binding.name is not None:
+            reserve_name(binding.name, scope)
+
+    def __call__(self, module, prefix_globals=False, reserved_globals=None):
         assert isinstance(module, ast.Module)
         add_assigned(module)
 
@@ -179,49 +239,49 @@ class NameAssigner:
 
         if reserved_globals is not None:
             for name in reserved_globals:
-                module.assigned_names.add(name)
-
-        def should_rename(binding, name, scope):
-            if binding.should_rename(name):
-                return True
-
-            # It's no longer efficient to do this mangler
-
-            if isinstance(binding, NameBinding):
-                # Check that the original name is still available
-
-                if binding.reserved == binding.name:
-                    # We already reserved it (this is probably an arg)
-                    return False
-
-                if not self.is_available(binding.name, scope):
-                    # The original name has already been assigned to another binding,
-                    # so we need to mangler this anyway.
-                    return True
-
-            return False
+                ref(module).assigned_names.add(name)
 
         for namespace, binding in sorted_bindings(module):
-            scope = reservation_scope(namespace, binding)
-
-            if binding.allow_rename:
-
-                if isinstance(namespace, ast.Module) and prefix_globals:
-                    name = self.available_name(scope, prefix='_')
-                else:
-                    name = self.available_name(scope)
-
-                if should_rename(binding, name, scope):
-                    binding.rename(name)
-                else:
-                    # Any existing name will become reserved
-                    binding.disallow_rename()
-
-            if binding.name is not None:
-                reserve_name(binding.name, scope)
+            prefix = '_' if prefix_globals and isinstance(namespace, ast.Module) else ''
+            self.assign(namespace, binding, prefix=prefix)
 
         return module
 
 
-def rename(module, prefix_globals=False, preserved_globals=None):
-    NameAssigner()(module, prefix_globals, preserved_globals)
+def mangle_locals(module, rename_locals=True, preserve_locals=None):
+    """
+    Mangle locals/nonlocals - names bound in function and class namespaces
+
+    Module-level (global) bindings are left untouched here; use
+    :func:`terser._pipeline.mangler.global_mangle.mangle_globals` for those, once every module
+    in the project has been through this step and linking has run.
+
+    :param module: The module to mangle locals in
+    :type module: :class:`ast.Module`
+    :param bool rename_locals: If local names may be renamed
+    :param preserve_locals: Local names to leave unchanged
+    :type preserve_locals: list[str] | None
+    """
+
+    allow_rename_locals(module, rename_locals, preserve_locals)
+
+    add_assigned(module)
+
+    for namespace, binding in all_bindings(module):
+        if binding.reserved is not None:
+            reserve_name(binding.reserved, reservation_scope(namespace, binding))
+
+    assigner = NameAssigner()
+
+    for namespace, binding in sorted_bindings(module):
+        if isinstance(namespace, ast.Module):
+            # Module-level (global) bindings are mangled later, project-wide, by
+            # global_mangle.mangle_globals - just reserve the current name so local
+            # renaming doesn't collide with it.
+            if binding.name is not None:
+                reserve_name(binding.name, reservation_scope(namespace, binding))
+            continue
+
+        assigner.assign(namespace, binding)
+
+    return module

@@ -7,6 +7,7 @@ from terser.ast.ref import spec
 
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from typing import Final
 
     type NestedDict[T] = dict[str, T | NestedDict[T]]
@@ -144,7 +145,7 @@ class PathProvider(MutableSet[str]):
         self.__discarded = set()
 
     @property
-    def namespace(self):
+    def specs(self):
         return self.__specs
 
     @property
@@ -214,7 +215,10 @@ class PathProvider(MutableSet[str]):
         return len(self.__iter)
 
     @override
-    def __iter__(self, /):
+    def __iter__(self):
+        pass
+
+    def iter(self, /) -> Iterator[spec.ModuleSpec]:
         assert self.is_resolved, "Path provider is not resolved yet"
         return iter(self.__iter)
 

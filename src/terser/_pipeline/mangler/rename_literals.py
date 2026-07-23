@@ -10,7 +10,7 @@ from terser.util import is_constant_node
 def replace(old_node, new_node):
     parent = get_parent(old_node)
     set_parent(new_node, parent)
-    new_node.namespace = old_node.namespace
+    new_node.specs = old_node.specs
 
     for field, old_value in ast.iter_fields(parent):
         if old_value is old_node:
@@ -134,9 +134,9 @@ class HoistLiterals(NodeVisitor):
 
         """
 
-        if isinstance(node.namespace, (ast.FunctionDef, ast.Module, ast.AsyncFunctionDef)):
-            return node.namespace
-        return self.nearest_function_namespace(node.namespace)
+        if isinstance(node.specs, (ast.FunctionDef, ast.Module, ast.AsyncFunctionDef)):
+            return node.specs
+        return self.nearest_function_namespace(node.specs)
 
     def namespace_path(self, node):
         """

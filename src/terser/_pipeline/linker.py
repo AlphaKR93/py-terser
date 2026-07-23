@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from terser.ast import ast
+from terser.ast import ast, ref
 from .resolver.binding import ImportBinding
 
 if TYPE_CHECKING:
@@ -71,16 +71,18 @@ def _link_wildcard(
         module_ref.bindings[index] = upgraded
 
 
-def link(module_ref: ModuleRef, project: dict[str, ModuleRef]) -> None:
+def link(module: ast.Module, project: dict[str, ModuleRef]) -> None:
     """
     Resolve every import's target and expand wildcard imports, using the other modules in the
     project. Must run after every module in the project has run `resolve_imports`, `mark_exports`
     and `binder.resolve` (the latter so undefined-but-used names have their fallback binding, for
     `_link_wildcard` to upgrade).
 
-    :param module_ref: The module to link imports for
+    :param module: The module to link imports for
     :param project: Every module in the project, keyed by resolved module path
     """
+
+    module_ref = ref(module)
 
     for binding, unresolved in module_ref.import_targets.items():
         _link_alias(binding, unresolved, project)

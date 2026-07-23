@@ -27,6 +27,8 @@ class ScopedNode[T: ContainsScope](NodeRef[T]):
     bindings: list[Binding]
     globals: set[str]
     nonlocals: set[str]
+    assigned_names: set[str]
+    """Names reserved in this namespace during mangling - set lazily, see mangler.renamer.add_assigned"""
 
     def __init__(self, node: T, parent: ast.AST):
         super().__init__(node, parent)

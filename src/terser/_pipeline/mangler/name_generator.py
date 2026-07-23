@@ -1,9 +1,8 @@
+import builtins
 import itertools
 import keyword
 import random
 import string
-
-from terser._pipeline.mangler.util import builtins
 
 
 def random_generator(length=40):

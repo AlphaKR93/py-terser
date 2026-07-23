@@ -22,7 +22,7 @@ Pipelines live under `terser._pipeline`, consists of these components:
 
 Project-wide pipeline stages live under `terser._pipeline`, run roughly in this order:
 
-1. Resolve paths — `PathProvider` (`paths.py`) takes a set of file/dir paths, walks directories for `*.py`/`*.pyw`, and `align()`s them into a namespace tree of `ModuleSpec` (`terser.ast.ref.module.spec`). This must run and resolve (`await pp.resolve()`) before any module is parsed, since parsing needs a module's `ModuleSpec` to know its dotted path and how to resolve relative imports.
+1. Resolve paths — `PathProvider` (`path_provider.py`) takes a set of file/dir paths, walks directories for `*.py`/`*.pyw`, and `align()`s them into a namespace tree of `ModuleSpec` (`terser.ast.ref.module.spec`). This must run and resolve (`await pp.resolve()`) before any module is parsed, since parsing needs a module's `ModuleSpec` to know its dotted path and how to resolve relative imports.
 2. Process individual modules asynchronously (multi-threaded) via `minify`.
 3. Linking (`linker.py`) — the actual project-aware step: once every module in the project has been through resolver, `link()` matches each module's `import_targets`/`wildcard_targets` against the full `project: dict[str, ModuleRef]` to resolve `import x.y` and`from x import *` across files. Wildcard imports can only be expanded once the target module's exports are known, which is why this is a separate, later pass.
 4. Apply project transforms — apply transforms with `FLAGS <= 2`, repeat `config.passes` times.

@@ -29,7 +29,7 @@ class CombineImports(SuiteTransformer):
         namespace = None
 
         for statement in node_list:
-            namespace = statement.namespace
+            namespace = statement.specs
             if isinstance(statement, ast.Import):
                 alias += statement.names
             else:

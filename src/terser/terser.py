@@ -45,7 +45,7 @@ def unparse(
     return printer.code
 
 
-async def minify(
+def minify(
     source: str,
     config: TransformConfig,
     path: str = "<unknown>",
@@ -80,7 +80,7 @@ async def minify(
 
     :rtype: str
     """
-    module, shebang = await __minify(source, DummySpec(path), config, **kwargs)
+    module, shebang = __minify(source, DummySpec(path), config, **kwargs)
 
     minified = unparse(path, source, module, prefer_single_line=prefer_single_line)
     return (shebang + '\n' + minified) if preserve_shebang and shebang else minified

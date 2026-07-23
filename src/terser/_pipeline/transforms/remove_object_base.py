@@ -6,11 +6,11 @@ from terser._pipeline.transforms._suite import SuiteTransformer
 
 
 class RemoveObject(SuiteTransformer):
-    def __call__(self, node):
-        if sys.version_info < (3, 0):
-            return node
+    FLAGS = 0
 
-        return self.visit(node)
+    @classmethod
+    def is_enabled(cls, config, /) -> bool:
+        return config.remove_explicit_base
 
     def visit_ClassDef(self, node):
         node.bases = [

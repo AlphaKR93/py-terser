@@ -61,7 +61,7 @@ def _link_wildcard(
         ):
             continue  # unused, or shadowed by a real local definition - the wildcard doesn't apply
 
-        upgraded = ImportBinding(binding.name, stmt)
+        upgraded = ImportBinding(binding.name, stmt, module_ref)
         for node in binding.references:
             upgraded.add_reference(node)
 

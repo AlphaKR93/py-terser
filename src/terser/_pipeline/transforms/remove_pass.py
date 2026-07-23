@@ -10,8 +10,11 @@ class RemovePass(SuiteTransformer):
     If a statement is syntactically necessary, use an empty expression instead
     """
 
-    def __call__(self, node):
-        return self.visit(node)
+    FLAGS = 0
+
+    @classmethod
+    def is_enabled(cls, config, /) -> bool:
+        return config.convert_pass
 
     def suite(self, node_list, parent):
         without_pass = [self.visit(a) for a in filter(lambda n: not isinstance(n, ast.Pass), node_list)]

@@ -18,5 +18,5 @@ def parse(source: str, spec: ModuleSpec | str, mode: str = "exec", **kwargs):
 
     module: Any = ast.parse(source, path, mode, **kwargs)
     module_ref = ModuleRef(module, spec)
-    ScopeResolver.module(module_ref)
+    ScopeResolver.module(module)
     return module, module_ref

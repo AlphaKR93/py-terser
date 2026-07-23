@@ -16,11 +16,16 @@ type ContainsScope = ast.Module | ast.ClassDef | Invokable | Comprehension
 class NodeRef[T: AST](ABC):
     _KLASSES: ClassVar[dict[type[ast.AST], type[NodeRef]]]
 
-    _ast: T
-    _binding: Binding
-    _parent: AST
+    __slots__ = ("__ast", "_binding", "parent")
+
+    @property
+    def ast(self) -> T: ...
+
+    @property
+    def binding(self) -> Binding: ...
 
     namespace: ContainsScope
+    parent: AST
 
     @classmethod
     def new(cls, node: T, parent: AST) -> NodeRef[T]: ...

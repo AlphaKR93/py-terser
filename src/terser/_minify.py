@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from terser.exceptions import InvalidTransformError
-from ._pipeline import preprocessor, parser, resolver
+from ._pipeline import preprocessor, parser, resolver, transforms
 from .ast import ast
 
 if TYPE_CHECKING:
@@ -16,10 +16,10 @@ async def minify(
     *,
     strict: bool = False,
     defines: dict[str, bool] | None = None,
-    hoist_literals=True,
-    rename_locals=True,
-    preserve_locals=None,
-) -> ast.Module:
+    hoist_literals: bool = True,
+    rename_locals: bool = True,
+    preserve_locals: list[str] | None = None,
+) -> tuple[ast.Module, str | None]:
     # TEMP: preprocess
     source, shebang = preprocessor.preprocess(source, defines, strict)
 
@@ -27,14 +27,24 @@ async def minify(
     module, module_ref = parser.parse(source, spec)
 
     # TEMP: apply transform (FLAG == 0)
+    for transform in transforms.__transforms__:
+        if not transform.is_enabled(config) or transform.FLAGS > 0:
+            continue
+
+        module: ast.Module = transform(config)(module)
 
     # TEMP: resolve
     resolver.resolve(module)
     resolver.bind(module)
 
     # TEMP: apply transform (FLAG <= 1)
+    cache = transforms.TransformCache(config)
     for _ in range(config.passes):
-        pass
+        for transform in transforms.__transforms__:
+            if not transform.is_enabled(config) or transform.FLAGS > 1:
+                continue
+
+            module: ast.Module = transform(cache)(module)
 
     # TEMP: mangle
     """
@@ -54,12 +64,17 @@ async def minify(
     """
 
     # TEMP: apply transform (FLAG <= 2)
+    cache = transforms.TransformCache(config)
     for _ in range(config.passes):
-        pass
+        for transform in transforms.__transforms__:
+            if not transform.is_enabled(config) or transform.FLAGS > 2:
+                continue
+
+            module: ast.Module = transform(cache)(module)
 
     try:
         module = ast.parse(module)
     except SyntaxError as exc:
         raise InvalidTransformError(exc, spec, source, module) from exc
 
-    return module
+    return module, shebang

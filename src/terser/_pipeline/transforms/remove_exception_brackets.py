@@ -8,12 +8,8 @@ When printed, this essentially removes the brackets from the exception name.
 We can't generally know if a name refers to an exception, so we only do this for builtin exceptions
 """
 
-import sys
-
-import terser.ast.ast as ast
-from terser.ast.annotation import get_parent, set_parent
-
-from terser._pipeline.mangler import BuiltinBinding
+from terser.ast import ast, ref
+from ..resolver.binding import BuiltinBinding
 
 
 # These are always exceptions, in every version of python
@@ -77,23 +73,19 @@ builtin_exceptions_3_11 = [
 ]
 
 
-def _remove_empty_call(binding):
-    assert isinstance(binding, BuiltinBinding)
-
+def _remove_empty_call(binding: BuiltinBinding):
     for name_node in binding.references:
         # For this to be a builtin, all references must be name nodes as it is not defined anywhere
         assert isinstance(name_node, ast.Name)
         assert isinstance(name_node.ctx, ast.Load)
 
-        if not isinstance(get_parent(name_node), ast.Call):
+        if not isinstance(call_node := ref(name_node).parent, ast.Call):
             # This is not a call
             continue
-        call_node = get_parent(name_node)
 
-        if not isinstance(get_parent(call_node), ast.Raise):
+        if not isinstance(raise_node := ref(call_node).parent, ast.Raise):
             # This is not a raise statement
             continue
-        raise_node = get_parent(call_node)
 
         if len(call_node.args) > 0 or len(call_node.keywords) > 0:
             # This is a call with arguments
@@ -106,14 +98,11 @@ def _remove_empty_call(binding):
             raise_node.exc = name_node
         elif raise_node.cause is call_node:
             raise_node.cause = name_node
-        set_parent(name_node, raise_node)
+        ref(name_node).parent = raise_node
 
 
 def remove_no_arg_exception_call(module):
     assert isinstance(module, ast.Module)
-
-    if sys.version_info < (3, 0):
-        return module
 
     for binding in module.bindings:
         if not isinstance(binding, BuiltinBinding):

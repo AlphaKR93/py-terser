@@ -1,10 +1,13 @@
 import math
-import sys
+from typing import TYPE_CHECKING, override
 
-from terser.ast import ast, compare_ast, is_constant_node
+from terser.ast import ast, compare_ast, is_constant_node, ref
 
 from ..printer.expression_printer import ExpressionPrinter
 from ._suite import SuiteTransformer
+
+if TYPE_CHECKING:
+    from ...config import TransformConfig
 
 
 def is_foldable_constant(node):
@@ -31,9 +34,12 @@ class FoldConstants(SuiteTransformer):
     """
     Fold Constants if it would reduce the size of the source
     """
+    FLAGS = 0
 
-    def __init__(self):
-        super(FoldConstants, self).__init__()
+    @override
+    @classmethod
+    def is_enabled(cls, config: TransformConfig, /) -> bool:
+        return config.fold_constants
 
     def fold(self, node):
         # Evaluate the expression
@@ -52,11 +58,7 @@ class FoldConstants(SuiteTransformer):
             new_node = ast.NameConstant(value=original_value)
         elif isinstance(original_value, (int, float, complex)):
             try:
-                if repr(original_value).startswith('-') and not sys.version_info < (3, 0):
-                    # Represent negative numbers as a USub UnaryOp, so that the ast roundtrip is correct
-                    new_node = ast.UnaryOp(op=ast.USub(), operand=ast.Num(n=-original_value))
-                else:
-                    new_node = ast.Num(n=original_value)
+                new_node = ast.Num(n=original_value)
             except Exception:
                 # repr(value) failed, most likely due to some limit
                 return node
@@ -90,7 +92,8 @@ class FoldConstants(SuiteTransformer):
             return node
 
         # New representation is shorter and has the same value, so use it
-        return self.add_child(new_node, get_parent(node), node.namespace)
+        node_ref = ref(node)
+        return self.add_child(new_node, node_ref.parent, node_ref.namespace)
 
     def visit_BinOp(self, node):
 

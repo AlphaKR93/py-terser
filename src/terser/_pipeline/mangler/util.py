@@ -1,23 +1,4 @@
-from warnings import deprecated
-
 from terser.ast import ast, is_constant_node
-
-
-NAMESPACED = (
-    ast.FunctionDef,
-    ast.Lambda,
-    ast.ClassDef,
-    ast.Module,
-    ast.GeneratorExp,
-    ast.SetComp,
-    ast.DictComp,
-    ast.ListComp,
-    ast.AsyncFunctionDef,
-)
-
-@deprecated("not necessary")
-def is_namespace(node: ast.AST):
-    return isinstance(node, NAMESPACED)
 
 
 def get_global_namespace(node: ast.AST):
@@ -140,36 +121,6 @@ def allow_rename_locals(node, rename_locals, preserve_locals=None):
 
     for child in ast.iter_child_nodes(node):
         allow_rename_locals(child, rename_locals, preserve_locals)
-
-
-def find__all__(module):
-
-    names = []
-
-    def is_assign_all_node(node):
-        if isinstance(node, ast.Assign):
-            for name in node.targets:
-                if isinstance(name, ast.Name) and name.id == '__all__':
-                    return True
-
-        elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
-            if isinstance(node.target, ast.Name) and node.target.id == '__all__':
-                return True
-
-        return False
-
-    for node in ast.iter_child_nodes(module):
-        if not is_assign_all_node(node):
-            continue
-
-        if not isinstance(node.value, ast.List):
-            continue
-
-        for el in node.value.elts:
-            if is_constant_node(el, ast.Str):
-                names.append(el.s)
-
-    return names
 
 
 def allow_rename_globals(module, rename_globals=False, preserve_globals=None):

@@ -6,6 +6,14 @@ if TYPE_CHECKING:
     from types import EllipsisType
 
 
+class NodeReplacer(ast.NodeVisitor):
+    def __init__(self, replaces: dict[str, ast.AST]):
+        self.replaces = replaces
+
+    def visit_Name(self, node: ast.Name):
+        return self.replaces.get(node.id, node)
+
+
 @dataclass(frozen=True)
 class ContractFunctionSpec:
     namespace: str
@@ -16,7 +24,15 @@ class ContractFunctionSpec:
 class Contract:
     name: str                               # e.g. "typing.cast", "terser_annotations.not_none"
     args: list[str | None] | EllipsisType   # e.g. [None, "value"], ...
-    convert_to: str | None                   # e.g. "value", 또는 None(제거)
+    convert_to: str | None                  # e.g. "value", 또는 None(제거)
+
+    def convert(self, /, **kwargs):
+        if not self.convert_to:
+            return ast.Constant(value=None)
+
+        convert_to = ast.parse(self.convert_to, mode="eval").body
+        NodeReplacer(kwargs).visit(convert_to)
+        return convert_to
 
 
 def __parse_name(node: ast.expr, /) -> str:

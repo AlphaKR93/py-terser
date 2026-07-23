@@ -2,7 +2,7 @@ import builtins
 from typing import TYPE_CHECKING
 
 from terser.ast import ModuleRef, ast, ref
-from ..binding import Binding, BuiltinBinding, NameBinding
+from ..binding import Binding, BuiltinBinding, UnresolvedBinding
 from ..util import scope_ref_global, scope_ref_nonlocal
 
 if TYPE_CHECKING:
@@ -11,16 +11,16 @@ if TYPE_CHECKING:
 
 def __get_binding(name: str, namespace_ref: ScopedNode) -> Binding:
     if name in namespace_ref.globals and not isinstance(namespace_ref, ModuleRef):
-        return __get_binding(name, scope_ref_global(namespace_ref._ast))
+        return __get_binding(name, scope_ref_global(namespace_ref.ast))
     elif name in namespace_ref.nonlocals and not isinstance(namespace_ref, ModuleRef):
-        return __get_binding(name, scope_ref_nonlocal(namespace_ref._ast))
+        return __get_binding(name, scope_ref_nonlocal(namespace_ref.ast))
 
     for binding in namespace_ref.bindings:
         if binding.name == name:
             return binding
 
     if not isinstance(namespace_ref, ModuleRef):
-        return __get_binding(name, scope_ref_nonlocal(namespace_ref._ast))
+        return __get_binding(name, scope_ref_nonlocal(namespace_ref.ast))
 
     else:
         # This is unresolved at global scope - is it a builtin?
@@ -28,13 +28,12 @@ def __get_binding(name: str, namespace_ref: ScopedNode) -> Binding:
             if name in ['exec', 'eval', 'locals', 'globals', 'vars']:
                 namespace_ref.tainted = True
 
-            binding = BuiltinBinding(name, namespace_ref._ast)
+            binding = BuiltinBinding(name, namespace_ref.ast)
             namespace_ref.bindings.append(binding)
             return binding
 
         else:
-            binding = NameBinding(name)
-            binding.disallow_rename()
+            binding = UnresolvedBinding(name)
             namespace_ref.bindings.append(binding)
             return binding
 

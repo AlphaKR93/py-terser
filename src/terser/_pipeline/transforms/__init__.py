@@ -1,3 +1,5 @@
+from ._suite import TransformCache
+from .contracts import Contracts
 from .combine_imports import CombineImports
 from .constant_folding import FoldConstants
 from .remove_annotations import RemoveAnnotations
@@ -10,6 +12,7 @@ from .remove_pass import RemovePass
 
 
 __transforms__ = [
+    Contracts,
     RemoveLiteralStatements,
     CombineImports,
     RemoveAnnotations,
@@ -20,3 +23,5 @@ __transforms__ = [
     RemoveExplicitReturnNone,
     FoldConstants,
 ]
+
+__all__ = ("TransformCache", "__transforms__")

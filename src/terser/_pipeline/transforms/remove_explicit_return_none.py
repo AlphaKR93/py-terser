@@ -1,24 +1,20 @@
-import sys
-
-import terser.ast.ast as ast
-
-from terser._pipeline.transforms._suite import SuiteTransformer
-from terser.util import is_constant_node
+from terser.ast import ast, is_constant_node
+from ._suite import SuiteTransformer
 
 
 class RemoveExplicitReturnNone(SuiteTransformer):
-    def __call__(self, node):
-        return self.visit(node)
+    FLAGS = 0
+
+    @classmethod
+    def is_enabled(cls, config, /) -> bool:
+        return config.remove_explicit_return_none
 
     def visit_Return(self, node):
         assert isinstance(node, ast.Return)
 
         # Transform `return None` -> `return`
 
-        if sys.version_info < (3, 4) and isinstance(node.value, ast.Name) and node.value.id == 'None':
-            node.value = None
-
-        elif sys.version_info >= (3, 4) and is_constant_node(node.value, ast.NameConstant) and node.value.value is None:
+        if is_constant_node(node.value, ast.NameConstant) and node.value.value is None:
             node.value = None
 
         return node

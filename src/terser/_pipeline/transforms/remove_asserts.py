@@ -9,9 +9,11 @@ class RemoveAsserts(SuiteTransformer):
 
     If a statement is syntactically necessary, use an empty expression instead
     """
+    FLAGS = 0
 
-    def __call__(self, node):
-        return self.visit(node)
+    @classmethod
+    def is_enabled(cls, config, /) -> bool:
+        return config.optimize == 2 or config.remove_asserts
 
     def suite(self, node_list, parent):
         without_assert = [self.visit(a) for a in filter(lambda n: not isinstance(n, ast.Assert), node_list)]

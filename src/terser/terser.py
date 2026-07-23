@@ -1,4 +1,4 @@
-from .ast import CompareError, ast, compare_ast
+from .ast import CompareError, ast, compare_ast, DummySpec
 
 from .exceptions import InvalidTransformError
 from terser._pipeline.printer.module_printer import ModulePrinter
@@ -9,10 +9,7 @@ from terser._pipeline.printer.module_printer import ModulePrinter
 #     rename_literals,
 # )
 
-from ._pipeline.linker import binder
-from ._pipeline.parser import parser
-from ._pipeline.preprocessor import preprocess
-from ._pipeline.transforms import __transforms__
+from ._minify import minify as __minify
 from .config import TransformConfig
 
 
@@ -48,17 +45,16 @@ def unparse(
     return printer.code
 
 
-def minify0(
+async def minify(
     source: str,
     config: TransformConfig,
     path: str = "<unknown>",
-    hoist_literals=True,
-    rename_locals=True,
-    preserve_locals=None,
+    /,
     rename_globals=False,
     preserve_globals=None,
     preserve_shebang=True,
     prefer_single_line=False,
+    **kwargs,
 ):
     """
     Minify a python module
@@ -84,57 +80,7 @@ def minify0(
 
     :rtype: str
     """
-
-    source, shebang = preprocess(source, {}, False)
-    module, module_ref = parser.parse(source, path)
-
-
-    for transform in __transforms__:
-        module = transform(config)(module)
-
-
-    binder.resolve(module)
-    binder.bind(module)
-
-
-    if config.remove_empty_exc_brackets and not module_ref.tainted:
-        remove_no_arg_exception_call(module)
-
-
-    if module_ref.tainted:
-        rename_globals = False
-        rename_locals = False
-
-    if preserve_locals is None:
-        preserve_locals = []
-    elif isinstance(preserve_locals, str):
-        preserve_locals = [preserve_locals]
-    if preserve_globals is None:
-        preserve_globals = []
-    elif isinstance(preserve_globals, str):
-        preserve_globals = [preserve_globals]
-
-    preserve_locals.extend(module.preserved)
-    preserve_globals.extend(module.preserved)
-
-    allow_rename_locals(module, rename_locals, preserve_locals)
-    allow_rename_globals(module, rename_globals, preserve_globals)
-
-    if hoist_literals:
-        rename_literals(module)
-
-    rename(module, prefix_globals=not rename_globals, preserved_globals=preserve_globals)
-
-
-    if config.convert_posargs:
-        module = remove_posargs(module)
-
-
-    try:
-        module = ast.parse(module)
-    except SyntaxError as exc:
-        raise InvalidTransformError(exc, path, source, module) from exc
-
+    module, shebang = await __minify(source, DummySpec(path), config, **kwargs)
 
     minified = unparse(path, source, module, prefer_single_line=prefer_single_line)
     return (shebang + '\n' + minified) if preserve_shebang and shebang else minified

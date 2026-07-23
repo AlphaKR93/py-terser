@@ -35,6 +35,10 @@ AST nodes are plain `ast.AST` subclasses (re-exported from `terser/ast/ast.py`);
 
 Which `NodeRef` subclass wraps a node is decided by `NodeRef._KLASSES[type(node)]`: plain nodes get a bare `NodeRef`, namespace-introducing nodes (`SCOPED_T` in `_scoped.py`) get a `ScopedNode` (adds `bindings`/`globals`/`nonlocals`), and `ast.Module` specifically gets `ModuleRef` (`ast/ref/_module/_module.py`, inherits `ScopedNode`), which additionally carries the module's `ModuleSpec`, `preserved`/`all`/`tainted` state, and the `import_targets`/`wildcard_targets` maps that `linker.py` consumes. When adding a new node kind that needs extra metadata, register it in `_KLASSES` rather than adding attributes to the AST node class.
 
-### Stub files
+### Name binding (`terser._pipeline.resolver.binder`)
 
-There are some hand-written stubs (per the user's Python type-checking convention: complex types go in `.pyi` rather than runtime annotations) — check these when a type-checker error exists and the runtime source doesn't explain it.
+After applying the pre-transform (phase 3 of `minify()`), the declaration of the name is bound. Bindings include `NameBinding`, `ImportBinding`, `UnresolvedBinding`, and `BuiltinBinding`. These will be used for project-wide processing.
+
+## Stub files
+
+There are some hand-written stubs (per the user's Python type-checking convention: complex types go in `.pyi` rather than runtime annotations to save resources) — check these when a type-checker error exists and the runtime source doesn't explain it.

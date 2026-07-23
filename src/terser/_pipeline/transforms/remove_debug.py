@@ -1,9 +1,5 @@
-import sys
-
-import terser.ast.ast as ast
-
-from terser._pipeline.transforms._suite import SuiteTransformer
-from terser.util import is_constant_node
+from terser.ast import ast, is_constant_node
+from ._suite import SuiteTransformer
 
 
 class RemoveDebug(SuiteTransformer):
@@ -12,28 +8,29 @@ class RemoveDebug(SuiteTransformer):
 
     If a statement is syntactically necessary, use an empty expression instead
     """
+    FLAGS = 0
 
-    def __call__(self, node):
-        return self.visit(node)
+    @classmethod
+    def is_enabled(cls, config, /) -> bool:
+        return config.optimize == 2 or config.remove_debug
 
-    def constant_value(self, node):
-        if sys.version_info < (3, 4):
-            return node.id == 'True'
-        elif is_constant_node(node, ast.NameConstant):
+    @staticmethod
+    def __constant(node):
+        if is_constant_node(node, ast.NameConstant):
             return node.value
         return None
 
-    def can_remove(self, node):
+    def __can_remove(self, node: ast.AST) -> bool:
         if not isinstance(node, ast.If):
             return False
 
-        def is_simple_debug_check():
+        def is_simple_debug_check(node: ast.If):
             # Simple case: if __debug__:
             if isinstance(node.test, ast.Name) and node.test.id == '__debug__':
                 return True
             return False
 
-        def is_truthy_debug_comparison():
+        def is_truthy_debug_comparison(node: ast.If):
             # Comparison case: if __debug__ is True / False / etc.
             if not isinstance(node.test, ast.Compare):
                 return False
@@ -46,7 +43,7 @@ class RemoveDebug(SuiteTransformer):
 
             if len(node.test.ops) == 1:
                 op = node.test.ops[0]
-                comparator_value = self.constant_value(node.test.comparators[0])
+                comparator_value = self.__constant(node.test.comparators[0])
 
                 if isinstance(op, ast.Is) and comparator_value is True:
                     return True
@@ -57,13 +54,13 @@ class RemoveDebug(SuiteTransformer):
 
             return False
 
-        if is_simple_debug_check() or is_truthy_debug_comparison():
+        if is_simple_debug_check(node) or is_truthy_debug_comparison(node):
             return True
         return False
 
     def suite(self, node_list, parent):
 
-        without_debug = [self.visit(a) for a in filter(lambda n: not self.can_remove(n), node_list)]
+        without_debug = [self.visit(a) for a in filter(lambda n: not self.__can_remove(n), node_list)]
 
         if len(without_debug) == 0:
             if isinstance(parent, ast.Module):

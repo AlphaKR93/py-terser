@@ -8,7 +8,7 @@ from alpha93.commons import typed
 from terser.ast import ast, ref, is_scoped
 
 if TYPE_CHECKING:
-    from terser.ast.ref import Comprehension, ContainsScope, Invokable, ModuleRef
+    from terser.ast.ref import Comprehension, ContainsScope, Invokable
 
 
 class ScopeResolver:
@@ -16,8 +16,7 @@ class ScopeResolver:
 
 
     @classmethod
-    def module(cls, node_ref: ModuleRef):
-        node = node_ref._ast
+    def module(cls, node: ast.Module):
         cls(ScopeResolver.__LOCK).__resolve(node, namespace=node)
 
 
@@ -65,7 +64,7 @@ class ScopeResolver:
         if isinstance(node, ast.Name) and isinstance(namespace, ast.ClassDef):
             if isinstance(node.ctx, ast.Load):
                 namespace_ref.nonlocals.add(node.id)
-            elif isinstance(node.ctx, ast.Store) and isinstance(node_ref._parent, ast.AugAssign):
+            elif isinstance(node.ctx, ast.Store) and isinstance(node_ref.parent, ast.AugAssign):
                 namespace_ref.nonlocals.add(node.id)
 
         if isinstance(node, ast.NamedExpr):

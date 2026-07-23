@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 
@@ -22,8 +22,15 @@ class RemoveAnnotationOptions:
 @dataclass()
 class TransformConfig:
     passes: int = 5
-
     optimize: Literal[-1, 0, 1, 2] = -1
+
+    contracts: list[str] = field(default_factory=lambda: [
+        "typing.cast(_, value) -> value",
+        "typing.assert_never(_) -> None",
+        "typing.assert_type(x, _) -> x",
+    ])
+
+    apply_contracts: bool = True
 
     remove_literal_statements: bool = False
     """Remove statements consisting of a single literal that does nothing"""
@@ -31,7 +38,7 @@ class TransformConfig:
     combine_imports: bool = True
     """Combine adjacent import statements where possible"""
 
-    remove_annotations: bool | RemoveAnnotationOptions | None = None
+    remove_annotations: bool | RemoveAnnotationOptions = True
     """Options that affect how annotations are removed"""
 
     remove_explicit_base: bool = True
@@ -45,6 +52,8 @@ class TransformConfig:
 
     remove_debug: bool = True
     """Remove conditional statements that test __debug__ is True (part of FoldConstants)"""
+
+    remove_asserts: bool = True
 
     convert_pass: bool = True
     """Remove or convert `pass` statements to the smallest literal statement, like `0`"""

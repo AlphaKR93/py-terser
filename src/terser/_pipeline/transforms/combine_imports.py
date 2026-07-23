@@ -1,6 +1,7 @@
 from terser.ast import ast as ast
 
 from ._suite import SuiteTransformer
+from ...config import TransformConfig
 
 
 class CombineImports(SuiteTransformer):
@@ -10,6 +11,12 @@ class CombineImports(SuiteTransformer):
     This doesn't change the order of imports
 
     """
+    FLAGS = 0
+
+    @classmethod
+    def is_enabled(cls, config: TransformConfig, /) -> bool:
+        return config.combine_imports
+
     def suite(self, node_list, parent):
         a = list(self._combine_import(node_list, parent))
         b = list(self._combine_import_from(a, parent))

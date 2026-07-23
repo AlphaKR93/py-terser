@@ -417,11 +417,45 @@ class ImportBinding(NameBinding):
     target: ModuleRef | None
     target_name: str | None
 
-    def __init__(self, name, node, *args, **kwargs):
+    def __init__(self, name, node, module_ref: ModuleRef, *args, **kwargs):
         super().__init__(name, *args, **kwargs)
         self.node = node
         self.target = None
         self.target_name = None
+        self._module_ref = module_ref
+
+    @override
+    def __repr__(self):
+        args = f"self.name={self.source_module}.{self.name}, {self.allow_rename=}, {self.exported=}"
+        return self.__class__.__name__ + f"({args}) <references={self.name_references}>"
+
+    @property
+    def source_module(self) -> str | None:
+        """
+        The dotted module path this name was imported from (e.g. "typing" for
+        `from typing import cast`, or the imported dotted path itself for a plain `import x.y`).
+
+        None if `resolve_imports` hasn't run yet, or the import couldn't be resolved (e.g. a
+        relative import climbing above the project root). Unaffected by whether the target
+        resolves within the project - unlike `target`, this is set for stdlib/third-party imports
+        too.
+        """
+        ref = self._module_ref.import_targets.get(self)
+        return ref.path if ref is not None else None
+
+
+class UnresolvedBinding(NameBinding):
+    """
+    Represents the usage of a name with no local definition, import, or builtin found anywhere in
+    scope - e.g. a typo, or a name provided dynamically at runtime.
+
+    Distinguished from a plain NameBinding so later passes can tell a genuinely local name apart
+    from one that couldn't be resolved.
+    """
+
+    def __init__(self, name: str, *args, **kwargs):
+        super().__init__(name, *args, **kwargs)
+        self.disallow_rename()
 
 
 class BuiltinBinding(NameBinding):

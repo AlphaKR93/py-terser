@@ -95,7 +95,7 @@ class NameResolver(NodeVisitor):
         if node.name == '*':
             # Deferred: the bound names depend on the target module's exports,
             # which are only known once every module in the project has been bound.
-            from_node = ref(node)._parent
+            from_node = ref(node).parent
             assert isinstance(from_node, ast.ImportFrom)
             self.module_ref.wildcard_targets.setdefault(from_node, None)    # type: ignore[ty:no-matching-overload]
             return
@@ -107,7 +107,7 @@ class NameResolver(NodeVisitor):
 
         namespace = ref(node).namespace
 
-        factory = lambda name: ImportBinding(name, node)
+        factory = lambda name: ImportBinding(name, node, self.module_ref)
         if node.asname is not None:
             if node.asname not in ref(namespace).nonlocals:
                 binding = self.__get_binding(node.asname, namespace, factory)

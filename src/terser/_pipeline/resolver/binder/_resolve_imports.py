@@ -49,7 +49,7 @@ def __import_from_target(module_ref: ModuleRef, stmt: ast.ImportFrom, name: str 
 
 def __binding_target(module_ref: ModuleRef, binding: ImportBinding) -> UnresolvedModuleRef:
     node = binding.node
-    stmt = ref(node)._parent
+    stmt = ref(node).parent
 
     if isinstance(stmt, ast.ImportFrom):
         return __import_from_target(module_ref, stmt, node.name)

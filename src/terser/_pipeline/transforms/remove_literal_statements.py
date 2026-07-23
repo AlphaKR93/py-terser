@@ -1,7 +1,5 @@
-import terser.ast.ast as ast
-
-from terser._pipeline.transforms._suite import SuiteTransformer
-from terser.util import is_constant_node
+from terser.ast import ast, is_constant_node
+from ._suite import SuiteTransformer
 
 
 def find_doc(node):
@@ -27,6 +25,11 @@ class RemoveLiteralStatements(SuiteTransformer):
 
     This includes docstrings
     """
+    FLAGS = 0
+
+    @classmethod
+    def is_enabled(cls, config, /) -> bool:
+        return config.remove_literal_statements
 
     def __call__(self, node):
         if _doc_in_module(node):

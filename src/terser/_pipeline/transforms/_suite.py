@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import IntFlag
 from typing import TYPE_CHECKING, ClassVar, final, override
@@ -8,6 +8,7 @@ from terser.ast import NodeVisitor, ast, ref
 from ..parser._scope import ScopeResolver
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from typing import Final, Self
 
     from terser.ast.ref import ContainsScope
@@ -44,8 +45,13 @@ class SuiteTransformer(NodeVisitor, ABC):
     _cache: Final[TransformCache | None]
     _is_node_modified: bool
 
+    @classmethod
+    @abstractmethod
+    def is_enabled(cls, config: TransformConfig, /) -> bool:
+        ...
+
     @final
-    def __new__(cls, ctx: TransformConfig | TransformCache, /) -> Self | None:
+    def __new__(cls, ctx: TransformConfig | TransformCache, /) -> Self:
         if not isinstance(ctx, TransformCache) or cls not in ctx.passes:
             return cls(ctx)
 
@@ -54,7 +60,7 @@ class SuiteTransformer(NodeVisitor, ABC):
             if ctx.passes[ctx.transforms[i]]:
                 break
         else:
-            return None
+            return lambda _: _  # type: ignore[ty:invalid-return-type]
 
         return cls(ctx)
 
@@ -67,7 +73,7 @@ class SuiteTransformer(NodeVisitor, ABC):
         self._config = config
         self._cache = cache
 
-    def suite(self, node_list, parent: ast.AST):
+    def suite(self, node_list, parent):
         return [self.visit(node) for node in node_list]
 
     @override
@@ -217,11 +223,11 @@ class SuiteTransformer(NodeVisitor, ABC):
 
             if isinstance(node, (ast.FunctionDef, ast.Module, ast.AsyncFunctionDef)):
                 return node
-            return nearest_function_namespace(ref(node)._parent)
+            return nearest_function_namespace(ref(node).parent)
 
         if namespace is None:
             namespace = nearest_function_namespace(parent)
 
-        ref(child)._parent = parent
+        ref(child).parent = parent
         ScopeResolver.child(child, namespace=namespace)
         return child

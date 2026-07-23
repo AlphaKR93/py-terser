@@ -64,7 +64,7 @@ def minify(
         source, shebang = preprocessor.preprocess(source, defines, strict)
 
     with task("Parsing AST"):
-        module = parser.parse(source, spec)
+        module = parser.parse(source, spec, optimize=config.optimize)
 
     with task("Applying transforms"):
         for transform in transforms.__transforms__:

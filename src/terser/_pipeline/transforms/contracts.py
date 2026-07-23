@@ -16,7 +16,7 @@ class Contracts(SuiteTransformer):
 
     def __init__(self, ctx, /):
         super().__init__(ctx)
-        _contracts = {c.name: c for c in map(contracts.parse, self._config.contracts)}  # TODO: Move to global
+        self._contracts = {c.name: c for c in map(contracts.parse, self._config.contracts)} # TODO: Move to global
 
     @override
     @classmethod
@@ -31,8 +31,10 @@ class Contracts(SuiteTransformer):
     @override
     def visit_Call(self, node: ast.Call):
         node: ast.Call = self.generic_visit(node)
-        node_ref = ref(node)
-        binding = node_ref.binding
+
+        if not isinstance(func := node.func, ast.Name):
+            return node
+        binding = ref(func).binding
 
         contract: contracts.Contract
         if (name0 := binding.name) and name0 in self._contracts:
@@ -50,6 +52,7 @@ class Contracts(SuiteTransformer):
             del name1
 
         if not contract.convert_to:
+            node_ref = ref(node)
             return self.add_child(ast.Constant(value=None), parent=node_ref.parent, namespace=node_ref.namespace)
 
         assert isinstance(contract.args, list)

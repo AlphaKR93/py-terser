@@ -1,4 +1,4 @@
-from terser.ast import ast as ast
+from terser.ast import ast, ref
 
 from ._suite import SuiteTransformer
 from ...config import TransformConfig
@@ -29,7 +29,6 @@ class CombineImports(SuiteTransformer):
         namespace = None
 
         for statement in node_list:
-            namespace = statement.specs
             if isinstance(statement, ast.Import):
                 alias += statement.names
             else:
@@ -69,7 +68,7 @@ class CombineImports(SuiteTransformer):
             else:
                 if alias:
                     yield self.add_child(
-                        ast.ImportFrom(module=prev_import.module, names=alias, level=prev_import.level), parent=parent, namespace=prev_import.namespace
+                        ast.ImportFrom(module=prev_import.module, names=alias, level=prev_import.level), parent=parent, namespace=ref(prev_import).namespace
                     )
                     alias = []
 
@@ -77,5 +76,5 @@ class CombineImports(SuiteTransformer):
 
         if alias:
             yield self.add_child(
-                ast.ImportFrom(module=prev_import.module, names=alias, level=prev_import.level), parent=parent, namespace=prev_import.namespace
+                ast.ImportFrom(module=prev_import.module, names=alias, level=prev_import.level), parent=parent, namespace=ref(prev_import).namespace
             )

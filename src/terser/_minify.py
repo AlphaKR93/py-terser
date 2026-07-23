@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 from terser.exceptions import InvalidTransformError
 from ._pipeline import preprocessor, parser, resolver, transforms
-from .ast import ast
+from .ast import ast, compare_ast
 
 if TYPE_CHECKING:
     from alpha93.progression import Task
@@ -75,9 +75,10 @@ def minify(
 
             module: ast.Module = transform(config)(module)
 
-    try:
-        module = ast.parse(module)
-    except SyntaxError as exc:
-        raise InvalidTransformError(exc, spec, source, module) from exc
+    # FIXME: lineno problem
+    # try:
+    #     module = ast.parse(module)
+    # except SyntaxError as exc:
+    #     raise InvalidTransformError(exc, spec, source, module) from exc
 
     return module, shebang

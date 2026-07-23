@@ -41,7 +41,7 @@ def __get_binding(name: str, namespace_ref: ScopedNode) -> Binding:
 def __attr_get_binding(name: str, namespace: ScopedNode) -> Binding:
     binding = __get_binding(name, namespace)
 
-    if isinstance(namespace, ast.ClassDef):
+    if isinstance(namespace.ast, ast.ClassDef):
         # This name will become an attribute of a class, so it can't be renamed
         binding.disallow_rename()
 
@@ -54,7 +54,10 @@ def bind(node: ast.AST):
 
     :param node: The node to resolve names in
     """
-    namespace = ref(node).namespace
+    try:
+        namespace = ref(node).namespace
+    except AttributeError:
+        namespace = ref(node).namespace
     namespace_ref = ref(namespace)
 
     if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):

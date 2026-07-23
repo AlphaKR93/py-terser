@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import IntFlag
+from enum import IntFlag, auto
 from typing import TYPE_CHECKING, ClassVar, final, override
 
 from alpha93.commons import typed
 from terser.ast import NodeVisitor, ast, ref
+from terser.ast.ref._node import NodeRef
 from ..parser._scope import ScopeResolver
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
     from typing import Final, Self
 
     from terser.ast.ref import ContainsScope
@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 
 @final
 class TransformerFlag(IntFlag):
-    from enum import auto
-
     REQUIRES_IMPORT_RESOLVE = auto()
     REQUIRES_MODULE_RESOLVE = auto()
     INFLUENCES_MANGLING = auto()
@@ -53,7 +51,9 @@ class SuiteTransformer(NodeVisitor, ABC):
     @final
     def __new__(cls, ctx: TransformConfig | TransformCache, /) -> Self:
         if not isinstance(ctx, TransformCache) or cls not in ctx.passes:
-            return cls(ctx)
+            obj = super().__new__(cls)
+            obj.__init__(ctx)
+            return obj
 
         assert not set(ctx.transforms).difference(set(ctx.passes.keys()))
         for i in range(ctx.transforms.index(cls)):
@@ -62,7 +62,9 @@ class SuiteTransformer(NodeVisitor, ABC):
         else:
             return lambda _: _  # type: ignore[ty:invalid-return-type]
 
-        return cls(ctx)
+        obj = super().__new__(cls)
+        obj.__init__(ctx)
+        return obj
 
     @final
     def __call__(self, module: ast.Module, /):
@@ -228,6 +230,7 @@ class SuiteTransformer(NodeVisitor, ABC):
         if namespace is None:
             namespace = nearest_function_namespace(parent)
 
-        ref(child).parent = parent
+        child_ref = NodeRef.new(child, parent)
+        child_ref._resolve_all()
         ScopeResolver.child(child, namespace=namespace)
         return child

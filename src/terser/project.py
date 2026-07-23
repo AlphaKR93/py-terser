@@ -1,3 +1,4 @@
+import asyncio
 from typing import TYPE_CHECKING
 
 from alpha93.progression import HeadlessReporter
@@ -8,7 +9,6 @@ from .ast import ref
 
 if TYPE_CHECKING:
     import ast
-    from collections.abc import AsyncGenerator
 
     from alpha93.progression import BaseReporter
 
@@ -34,13 +34,20 @@ class ProjectMinifier(Pipeline):
 
         await cls(pp, config, reporter)()
 
-    async def __minify_modules(self) -> AsyncGenerator[tuple[ast.Module, str | None]]:
-        async for task, spec in self.reporter.aiter(self.__pp.iter(), "Parsing modules"):
-            source = await spec.path.read_text()
-            yield minify(task, source, spec, self.config)
+    async def __minify_module(self, task, spec) -> ast.Module:
+        source = await spec.path.read_text()
+        module, _ = await asyncio.to_thread(minify, task, source, spec, self.config)
+        return module
+
+    async def __minify_modules(self) -> list[ast.Module]:
+        tasks = [
+            self.__minify_module(task, spec)
+            async for task, spec in self.reporter.aiter(self.__pp.iter(), "Parsing modules")
+        ]
+        return await asyncio.gather(*tasks)
 
     async def __call__(self, /):
-        collected = {x async for x, _ in self.__minify_modules()}   # TODO: multi-threaded
+        collected = set(await self.__minify_modules())
         project = {str(ref(x).spec): ref(x) for x in collected}
 
         for _, module in self.reporter.iter(collected, "Linking"):

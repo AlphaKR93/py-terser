@@ -17,7 +17,7 @@ class ModuleSpec(ABC):
     @final
     @property
     def name(self) -> str:
-        return self.__namespace.rsplit('.', 2)[1]
+        return self.__namespace.rsplit('.', 1)[1]
 
     @property
     @abstractmethod

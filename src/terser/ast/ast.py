@@ -13,8 +13,7 @@ from ast import *
 
 
 # noinspection unresolved-references,unused-local
-@lambda _: _() if "TypeAlias" in globals() else None
-def __register():
+if "TypeAlias" in globals():
     # Add n and s properties to Constant so it can stand in for Num, Str and Bytes
     Constant.n = property(lambda self: self.value, lambda self, value: setattr(self, 'value', value))
     Constant.s = property(lambda self: self.value, lambda self, value: setattr(self, 'value', value))

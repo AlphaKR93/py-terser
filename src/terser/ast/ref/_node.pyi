@@ -16,7 +16,7 @@ type ContainsScope = ast.Module | ast.ClassDef | Invokable | Comprehension
 class NodeRef[T: AST](ABC):
     _KLASSES: ClassVar[dict[type[ast.AST], type[NodeRef]]]
 
-    __slots__ = ("__ast", "_binding", "parent")
+    __slots__ = ("__ast", "_binding", "parent", "namespace")
 
     @property
     def ast(self) -> T: ...

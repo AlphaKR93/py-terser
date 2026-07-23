@@ -36,7 +36,7 @@ class NameResolver(NodeVisitor):
     def __get_binding(self, name: str, namespace: ContainsScope, factory: Callable[[str], Binding] = NameBinding):
         namespace_ref = ref(namespace)
         if name in namespace_ref.globals and not isinstance(namespace, ast.Module):
-            return self.__get_binding(name, scope_ref_global(namespace)._ast, factory=factory)
+            return self.__get_binding(name, scope_ref_global(namespace).ast, factory=factory)
 
         # nonlocal names should not create a binding in any context
         assert name not in namespace_ref.nonlocals

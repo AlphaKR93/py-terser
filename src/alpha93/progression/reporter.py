@@ -10,6 +10,9 @@ class Reporter:
 
 
 class BaseReporter(Reporter):
+    def init(self, len):
+        pass
+
     def iter(self, iterable, message):
         from .tasks.context import IterableTaskContext
         return IterableTaskContext(iterable)

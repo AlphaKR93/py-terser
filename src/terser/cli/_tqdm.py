@@ -55,15 +55,31 @@ class _TqdmAsyncIterableTaskContext(AsyncIterableTaskContext):
 class TqdmReporter(BaseReporter):
     def __init__(self, position=0):
         self._position = position
+        self._overall = None
+
+    def init(self, len):
+        self._overall = tqdm(total=len, desc="Overall", position=self._position, leave=True)
+        self._position += 1
+
+    def _tick(self):
+        if self._overall is None:
+            return
+        self._overall.update(1)
+        if self._overall.n >= self._overall.total:
+            self._overall.close()
 
     def __call__(self, message):
+        self._tick()
         return _TqdmStepContext(message, self._position)
 
     def range(self, i, message):
+        self._tick()
         return _TqdmIterableStep(i, message, self._position)
 
     def iter(self, iterable, message):
+        self._tick()
         return _TqdmIterableTaskContext(iterable, message, self._position)
 
     def aiter(self, iterable, message):
+        self._tick()
         return _TqdmAsyncIterableTaskContext(iterable, message, self._position)

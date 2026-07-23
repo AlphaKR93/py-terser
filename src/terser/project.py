@@ -26,6 +26,7 @@ class ProjectMinifier(Pipeline):
     @classmethod
     async def minify(cls, paths: set[str], config: TransformConfig, reporter: BaseReporter | None = None, /):
         reporter = reporter or HeadlessReporter()
+        reporter.init(len=6)
 
         with reporter("Resolving paths"):
             pp = PathProvider(paths)

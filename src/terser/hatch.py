@@ -25,7 +25,7 @@ class TerserBuildHook(BuildHookInterface):
             return
 
         roots = set()
-        for f in py_files:
+        for f in included_files:
             str_path = str(f.path)
             dist_path = str(f.distribution_path)
             if str_path.endswith(dist_path):

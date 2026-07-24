@@ -122,6 +122,7 @@ class ProjectMinifier(Pipeline):
     async def __call__(self, /):
         collected = set(await self.__minify_modules())
         project = {str(ref(x).spec): ref(x) for x in collected}
+        full_project = project
 
         for _, module in self.reporter.iter(collected, "Linking"):
             linker.link(module, project)
@@ -159,12 +160,21 @@ class ProjectMinifier(Pipeline):
         with self.reporter("Writing output"):
             tasks = [self.__dump_module(module, new_dotted) for module in collected]
             if self.output is not None:
-                tasks.extend(self.__copy_ffi_file(ffi_path) for ffi_path in self.__pp.ffi_files)
+                tasks.extend(
+                    self.__copy_ffi_file(ffi_path, full_project, project, new_dotted)
+                    for ffi_path in self.__pp.ffi_files
+                )
             await asyncio.gather(*tasks)
 
-    async def __copy_ffi_file(self, ffi_path: Path):
-        if self.output is None:
-            return
+    def __ffi_companion_dotted(self, ffi_path: Path) -> str | None:
+        """
+        The dotted module path this FFI file sits beside, if any.
+
+        Native extensions are conventionally named after the module they belong to (optionally
+        with an ABI tag before the suffix, e.g. ``foo.cpython-314-x86_64-linux-gnu.so`` or a bare
+        ``foo.so``) - matching on the part before the first dot recovers that module name so the
+        FFI file can be renamed/dropped in lockstep with its Python sibling.
+        """
 
         root = None
         for r in self.__pp.roots:
@@ -172,7 +182,43 @@ class ProjectMinifier(Pipeline):
                 root = r
                 break
 
-        dest = self.output / (ffi_path.relative_to(root) if root else ffi_path.name)
+        if root is None:
+            return None
+
+        stem = ffi_path.name.split('.', 1)[0]
+        parts = ffi_path.parent.relative_to(root).parts
+        return '.'.join((*parts, stem)) if parts else stem
+
+    async def __copy_ffi_file(
+        self,
+        ffi_path: Path,
+        full_project: dict[str, ModuleRef],
+        project: dict[str, ModuleRef],
+        new_dotted: dict[str, str],
+    ):
+        if self.output is None:
+            return
+
+        companion = self.__ffi_companion_dotted(ffi_path)
+
+        if companion is not None and companion in full_project and companion not in project:
+            # sibling module was tree-shaken away - the FFI file has no reachable consumer left
+            return
+
+        if companion is not None and companion in new_dotted:
+            new_leaf = new_dotted[companion].rsplit('.', 1)[-1]
+            _, _, tag = ffi_path.name.partition('.')
+            new_name = f"{new_leaf}.{tag}" if tag else new_leaf
+            dest = self.output.joinpath(*new_dotted[companion].split('.')[:-1], new_name)
+        else:
+            root = None
+            for r in self.__pp.roots:
+                if ffi_path.is_relative_to(r):
+                    root = r
+                    break
+
+            dest = self.output / (ffi_path.relative_to(root) if root else ffi_path.name)
+
         await dest.parent.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(shutil.copy2, str(ffi_path), str(dest))
 

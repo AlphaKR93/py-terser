@@ -1,4 +1,4 @@
-from ._suite import TransformCache
+from ._suite import TransformCache, apply_pass
 from .contracts import Contracts
 from .combine_imports import CombineImports
 from .constant_folding import FoldConstants
@@ -69,4 +69,4 @@ __transforms__ = [
     RemoveAll,
 ]
 
-__all__ = ("TransformCache", "__transforms__")
+__all__ = ("TransformCache", "apply_pass", "__transforms__")

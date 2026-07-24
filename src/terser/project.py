@@ -111,22 +111,26 @@ class ProjectMinifier(Pipeline):
         for _, module in self.reporter.iter(collected, "Linking"):
             linker.link(module, project)
 
-        cache = transforms.TransformCache(self.config)
+        # Each module gets its own TransformCache - cache.passes tracks per-transform
+        # "did this change the module" for SuiteTransformer.__new__'s skip-unchanged
+        # optimization, which is meaningless if shared across independent module trees.
+        caches = {module: transforms.TransformCache(self.config) for module in collected}
+
         for _ in self.reporter.range(self.config.passes, "Applying transforms"):
+            changed = False
             for module in collected:
-                for transform in transforms.__transforms__:
-                    if not transform.is_enabled(self.config) or transform.FLAGS > 2:
-                        continue
+                cache = caches[module]
+                transforms.apply_pass(cache, module, transforms.__transforms__, 2)  # mutates module in place
+                changed = changed or any(cache.passes.values())
 
-                    module: ast.Module = transform(cache)(module)
-
-            if not any(cache.passes.values()):
+            if not changed:
                 break
 
         with self.reporter("Mangling"):
             mangler.mangle_globals(project, self.rename_globals, self.preserve_globals)
 
         for _, module in self.reporter.iter(collected, "Applying transforms"):
+            cache = caches[module]
             for transform in transforms.__transforms__:
                 if not transform.is_enabled(self.config) or transform.FLAGS > 4:
                     continue

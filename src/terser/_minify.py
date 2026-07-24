@@ -79,11 +79,7 @@ def minify(
 
     cache = transforms.TransformCache(config)
     for _ in task.range(config.passes, "Applying transforms"):
-        for transform in transforms.__transforms__:
-            if not transform.is_enabled(config) or transform.FLAGS > 1:
-                continue
-
-            module: ast.Module = transform(cache)(module)
+        module = transforms.apply_pass(cache, module, transforms.__transforms__, 1)
 
         if not any(cache.passes.values()):
             break

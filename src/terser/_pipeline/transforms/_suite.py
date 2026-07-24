@@ -11,6 +11,7 @@ from ..resolver import bind_names, resolve_subtree
 from ..resolver.util import scope_ref_global
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from typing import Final, Self
 
     from terser.ast.ref import ContainsScope
@@ -33,6 +34,26 @@ class TransformCache:
 
     transforms: list[type[SuiteTransformer]] = field(default_factory=list)
     passes: dict[type[SuiteTransformer], bool] = field(default_factory=dict)
+
+
+def apply_pass(cache: TransformCache, module: ast.Module, transform_types: Iterable[type[SuiteTransformer]], flags_max: TransformerFlag | int) -> ast.Module:
+    """
+    Apply every enabled transform up to `flags_max` once, recording per-transform
+    whether it changed the module into `cache.passes`.
+
+    Callers should loop this until `not any(cache.passes.values())` (nothing
+    changed this pass) or `config.passes` is reached - `SuiteTransformer.__new__`
+    uses `cache.passes` to skip re-running a transform when nothing earlier in
+    `cache.transforms` changed since the last pass.
+    """
+    cache.transforms = [t for t in transform_types if t.is_enabled(cache.config) and t.FLAGS <= flags_max]
+
+    for transform in cache.transforms:
+        before = ast.dump(module)
+        module = transform(cache)(module)
+        cache.passes[transform] = ast.dump(module) != before
+
+    return module
 
 
 class SuiteTransformer(NodeVisitor, ABC):

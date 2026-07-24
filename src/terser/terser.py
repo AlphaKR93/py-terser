@@ -2,7 +2,7 @@ from alpha93.progression.tasks import Task
 
 from ._minify import minify as __minify, unparse as __unparse
 from ._pipeline import transforms
-from .ast import DummySpec, ast
+from .ast import DummySpec
 from .config import TransformConfig
 from .project import ProjectMinifier
 
@@ -46,11 +46,7 @@ def minify(
 
     cache = transforms.TransformCache(config)
     for _ in range(config.passes):
-        for transform in transforms.__transforms__:
-            if not transform.is_enabled(config) or transform.FLAGS > 4:
-                continue
-
-            module: ast.Module = transform(cache)(module)
+        module = transforms.apply_pass(cache, module, transforms.__transforms__, 4)
 
         if not any(cache.passes.values()):
             break

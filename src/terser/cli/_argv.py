@@ -1,10 +1,10 @@
 from typing import TYPE_CHECKING, Annotated
 
-from alpha93.argparse import MutuallyExclusive
 from alpha93.commons.pydantic import dataclasses
 from pydantic import BaseModel, ConfigDict, Field
 
 from terser.config import TransformConfig, RemoveAnnotationOptions
+from ._argparse import MutuallyExclusive
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -88,6 +88,10 @@ class TerserArguments(BaseModel):
 
     mangling_options: ManglingOptions
 
+    workers: int | None = None
+    """Number of worker threads to process modules with in project mode. Defaults to the
+    interpreter's default thread pool sizing."""
+
 # TODO: Cleanup this shit
 class TerserParsedArguments(TerserArguments):
     path: set[str]
@@ -134,4 +138,5 @@ class TerserParsedArguments(TerserArguments):
             prefer_single_line=namespace.prefer_single_line,
             transform_options=transform_options,
             mangling_options=mangling_options,
+            workers=namespace.workers,
         )

@@ -1,11 +1,11 @@
 import ast
 
 from helpers import print_namespace
-from terser._ast.annotation import add_parent
+from python_minifier._ast.annotation import add_parent
 
-from terser._ast.compare import compare_ast
-from terser.rename import add_namespace, bind_names, resolve_names
-from terser.transforms.combine_imports import CombineImports
+from python_minifier._ast.compare import compare_ast
+from python_minifier.rename import add_namespace, bind_names, resolve_names
+from python_minifier.transforms.combine_imports import CombineImports
 
 
 def combine_imports(module):

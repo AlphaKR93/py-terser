@@ -3,9 +3,9 @@ import sys
 
 import pytest
 
-from terser import unparse
-from terser._ast.compare import compare_ast
-from terser.transforms.remove_explicit_return_none import RemoveExplicitReturnNone
+from python_minifier import unparse
+from python_minifier._ast.compare import compare_ast
+from python_minifier.transforms.remove_explicit_return_none import RemoveExplicitReturnNone
 
 
 def remove_return_none(source):

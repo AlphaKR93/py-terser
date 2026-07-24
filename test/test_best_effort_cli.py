@@ -27,7 +27,7 @@ if __name__ == "__main__":
         env.pop('PYMINIFY_FORCE_BEST_EFFORT', None)
 
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file
+            sys.executable, '-m', 'python_minifier', temp_file
         ], timeout=30, env=env)
 
         assert result.returncode == 0
@@ -52,7 +52,7 @@ def test_returns_original_when_longer():
         env.pop('PYMINIFY_FORCE_BEST_EFFORT', None)
 
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file
+            sys.executable, '-m', 'python_minifier', temp_file
         ], timeout=30, env=env)
 
         assert result.returncode == 0
@@ -78,7 +78,7 @@ def test_force_minified_with_env_var():
         env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
 
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file
+            sys.executable, '-m', 'python_minifier', temp_file
         ], timeout=30, env=env)
 
         assert result.returncode == 0
@@ -100,7 +100,7 @@ def test_stdin_behavior():
     env.pop('PYMINIFY_FORCE_BEST_EFFORT', None)
 
     result = run_subprocess([
-        sys.executable, '-m', 'terser', '-'
+        sys.executable, '-m', 'python_minifier', '-'
     ], input_data=code, timeout=30, env=env)
 
     assert result.returncode == 0
@@ -111,7 +111,7 @@ def test_stdin_behavior():
     env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
 
     result = run_subprocess([
-        sys.executable, '-m', 'terser', '-'
+        sys.executable, '-m', 'python_minifier', '-'
     ], input_data=code, timeout=30, env=env)
 
     assert result.returncode == 0
@@ -135,7 +135,7 @@ def test_output_file_behavior():
         env.pop('PYMINIFY_FORCE_BEST_EFFORT', None)
 
         result = run_subprocess([
-            sys.executable, '-m', 'terser',
+            sys.executable, '-m', 'python_minifier',
             input_filename, '--output', output_filename
         ], timeout=30, env=env)
 
@@ -164,7 +164,7 @@ def test_in_place_behavior():
         env.pop('PYMINIFY_FORCE_BEST_EFFORT', None)
 
         result = run_subprocess([
-            sys.executable, '-m', 'terser',
+            sys.executable, '-m', 'python_minifier',
             temp_file, '--in-place'
         ], timeout=30, env=env)
 
@@ -186,29 +186,29 @@ def test_directory_output_and_reachability():
         vendor_path = os.path.join(src_dir, '_vendor')
         os.makedirs(src_path)
         os.makedirs(vendor_path)
-        
+
         app_code = "from my_vendor import used_func\nused_func()"
         with open(os.path.join(src_path, 'app.py'), 'w') as f:
             f.write(app_code)
-            
+
         vendor_code = "def used_func():\n    pass"
         with open(os.path.join(vendor_path, 'my_vendor.py'), 'w') as f:
             f.write(vendor_code)
-            
+
         unused_code = "def unused_func():\n    pass"
         with open(os.path.join(vendor_path, 'unused_vendor.py'), 'w') as f:
             f.write(unused_code)
-            
+
         out_dir = os.path.join(src_dir, 'out')
-        
+
         env = os.environ.copy()
         env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
-        
+
         result = run_subprocess([
-            sys.executable, '-m', 'terser',
+            sys.executable, '-m', 'python_minifier',
             src_path, vendor_path, '--output', out_dir
         ], timeout=30, env=env)
-        
+
         assert result.returncode == 0
         out_files = os.listdir(out_dir)
         assert len(out_files) == 2
@@ -223,30 +223,30 @@ def test_in_place_reachability():
         vendor_path = os.path.join(src_dir, '_vendor')
         os.makedirs(src_path)
         os.makedirs(vendor_path)
-        
+
         app_code = "from my_vendor import used_func\nused_func()"
         app_file = os.path.join(src_path, 'app.py')
         with open(app_file, 'w') as f:
             f.write(app_code)
-            
+
         vendor_code = "def used_func():\n    pass"
         vendor_file = os.path.join(vendor_path, 'my_vendor.py')
         with open(vendor_file, 'w') as f:
             f.write(vendor_code)
-            
+
         unused_file = os.path.join(vendor_path, 'unused_vendor.py')
         unused_code = "def unused_func():\n    pass"
         with open(unused_file, 'w') as f:
             f.write(unused_code)
-            
+
         env = os.environ.copy()
         env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
-        
+
         result = run_subprocess([
-            sys.executable, '-m', 'terser',
+            sys.executable, '-m', 'python_minifier',
             src_path, vendor_path, '--in-place'
         ], timeout=30, env=env)
-        
+
         assert result.returncode == 0
         src_files = os.listdir(src_path)
         assert len(src_files) == 1
@@ -259,20 +259,20 @@ def test_large_number_of_components():
     """Test that cli can handle a very large number of top-level names without raising StopIteration."""
     classes = [f"class Class{i}:\n    pass" for i in range(3000)]
     code = "\n".join(classes)
-    
+
     with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
         f.write(code)
         temp_file = f.name
-        
+
     try:
         env = os.environ.copy()
         env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
-        
+
         result = run_subprocess([
-            sys.executable, '-m', 'terser',
+            sys.executable, '-m', 'python_minifier',
             temp_file, '--output', temp_file + '.out'
         ], timeout=60, env=env)
-        
+
         assert result.returncode == 0
         assert os.path.exists(temp_file + '.out')
     finally:
@@ -296,7 +296,7 @@ def f():
         env = os.environ.copy()
         env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file, '--optimize'
+            sys.executable, '-m', 'python_minifier', temp_file, '--optimize'
         ], env=env)
         assert result.returncode == 0
         stdout_text = safe_decode(result.stdout)
@@ -322,10 +322,10 @@ print("Silent")
     try:
         env = os.environ.copy()
         env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
-        
+
         # Test with CHICKEN defined
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file, '--define', 'CHICKEN'
+            sys.executable, '-m', 'python_minifier', temp_file, '--define', 'CHICKEN'
         ], env=env)
         assert result.returncode == 0
         stdout_text = safe_decode(result.stdout)
@@ -334,7 +334,7 @@ print("Silent")
 
         # Test with CHICKEN=0
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file, '--define', 'CHICKEN=0'
+            sys.executable, '-m', 'python_minifier', temp_file, '--define', 'CHICKEN=0'
         ], env=env)
         assert result.returncode == 0
         stdout_text = safe_decode(result.stdout)
@@ -360,7 +360,7 @@ def f():
 
         # Without --no-strict-docstrings, strict should be True and preserve module docstring (by default)
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file, '--remove-literal-statements'
+            sys.executable, '-m', 'python_minifier', temp_file, '--remove-literal-statements'
         ], env=env)
         assert result.returncode == 0
         stdout_text = safe_decode(result.stdout)
@@ -368,7 +368,7 @@ def f():
 
         # With --no-strict-docstrings, strict is False, module docstring is removed
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file, '--remove-literal-statements', '--no-strict-docstrings'
+            sys.executable, '-m', 'python_minifier', temp_file, '--remove-literal-statements', '--no-strict-docstrings'
         ], env=env)
         assert result.returncode == 0
         stdout_text = safe_decode(result.stdout)
@@ -389,7 +389,7 @@ def test_cli_no_remove_type_stmt_option():
 
         # Default removes type statement
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file
+            sys.executable, '-m', 'python_minifier', temp_file
         ], env=env)
         assert result.returncode == 0
         stdout_text = safe_decode(result.stdout).strip()
@@ -397,7 +397,7 @@ def test_cli_no_remove_type_stmt_option():
 
         # --no-remove-type-stmt preserves it
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file, '--no-remove-type-stmt'
+            sys.executable, '-m', 'python_minifier', temp_file, '--no-remove-type-stmt'
         ], env=env)
         assert result.returncode == 0
         stdout_text = safe_decode(result.stdout).strip()
@@ -418,7 +418,7 @@ def test_cli_no_simplify_dynamic_attrs_option():
 
         # Default simplifies to obj.foo
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file
+            sys.executable, '-m', 'python_minifier', temp_file
         ], env=env)
         assert result.returncode == 0
         stdout_text = safe_decode(result.stdout).strip()
@@ -427,7 +427,7 @@ def test_cli_no_simplify_dynamic_attrs_option():
 
         # --no-simplify-dynamic-attrs preserves getattr(obj, "foo")
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file, '--no-simplify-dynamic-attrs'
+            sys.executable, '-m', 'python_minifier', temp_file, '--no-simplify-dynamic-attrs'
         ], env=env)
         assert result.returncode == 0
         stdout_text = safe_decode(result.stdout).strip()
@@ -454,7 +454,7 @@ def f(cond):
 
         # Default converts to ternary return a if cond else b
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file
+            sys.executable, '-m', 'python_minifier', temp_file
         ], env=env)
         assert result.returncode == 0
         stdout_text = safe_decode(result.stdout).strip()
@@ -471,7 +471,7 @@ def f(cond):
         # If we use --no-convert-to-ternary, we still have "if cond:return a\nreturn b" (with trailing returns simplified).
         # So we can just check if --no-convert-to-ternary executes without error first.
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file, '--no-convert-to-ternary'
+            sys.executable, '-m', 'python_minifier', temp_file, '--no-convert-to-ternary'
         ], env=env)
         assert result.returncode == 0
     finally:
@@ -493,7 +493,7 @@ other_val = "mangle_me"
         env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
 
         result = run_subprocess([
-            sys.executable, '-m', 'terser', file_path,
+            sys.executable, '-m', 'python_minifier', file_path,
             '--rename-globals', '--preserve-globals', 'app:app'
         ], env=env)
 
@@ -518,7 +518,7 @@ from os import path
         env['PYMINIFY_FORCE_BEST_EFFORT'] = '1'
 
         result = run_subprocess([
-            sys.executable, '-m', 'terser', file_path
+            sys.executable, '-m', 'python_minifier', file_path
         ], env=env)
 
         assert result.returncode == 0
@@ -532,14 +532,14 @@ def test_fallback_obfuscation_on_transform_failure():
     # We trigger a minification transformation crash using a custom expression or stability issue if possible,
     # or by injecting a SyntaxError, but wait! SyntaxError during AST compare or print is caught.
     # Let's verify that a file that causes CompareError fallback still obfuscates globals.
-    # In python-terser, a statement that changes AST comparison behavior but parses fine:
+    # In python-python_minifier, a statement that changes AST comparison behavior but parses fine:
     # We can also mock / trigger it or use a known scenario.
     # Wait, what if we use the pipeline and trigger an UnstableMinification?
     # UnstableMinification can be raised from ModulePrinter if the printed code parses to a different AST.
     # E.g. we can just test that calling pipeline directly with an error triggers fallback.
-    from terser.config import TerserConfig
-    from terser.pipeline import Pipeline
-    import terser._ast as ast
+    from python_minifier.config import TerserConfig
+    from python_minifier.pipeline import Pipeline
+    import python_minifier._ast as ast
 
     # Create config with module_name_map
     config = TerserConfig(
@@ -548,9 +548,9 @@ def test_fallback_obfuscation_on_transform_failure():
         current_module_name="mymod"
     )
     pipeline = Pipeline(config)
-    
+
     # We can monkeypatch TransformRunner.run to raise an exception
-    from terser.transforms.runner import TransformRunner
+    from python_minifier.transforms.runner import TransformRunner
     original_run = TransformRunner.run
     call_count = 0
     def bad_run(self, module):
@@ -559,7 +559,7 @@ def test_fallback_obfuscation_on_transform_failure():
         if call_count == 1:
             raise RuntimeError("Minification failed!")
         return original_run(self, module)
-    
+
     TransformRunner.run = bad_run
     try:
         source = "my_global = 42\nprint(my_global)"
@@ -592,7 +592,7 @@ other_val = "mangle_me"
         os.chdir(tmpdir)
         try:
             result = run_subprocess([
-                sys.executable, '-m', 'terser', 'src/app.py',
+                sys.executable, '-m', 'python_minifier', 'src/app.py',
                 '--rename-globals', '--preserve-globals', 'app:app'
             ], env=env)
         finally:

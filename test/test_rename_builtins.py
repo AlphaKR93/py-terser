@@ -6,10 +6,10 @@ This assumes the standard NameAssigner and name_generator
 
 import ast
 
-from terser import unparse
-from terser._ast.annotation import add_parent
-from terser._ast.compare import CompareError, compare_ast
-from terser.rename import add_namespace, allow_rename_globals, allow_rename_locals, bind_names, rename, resolve_names
+from python_minifier import unparse
+from python_minifier._ast.annotation import add_parent
+from python_minifier._ast.compare import CompareError, compare_ast
+from python_minifier.rename import add_namespace, allow_rename_globals, allow_rename_locals, bind_names, rename, resolve_names
 
 
 def do_rename(source):

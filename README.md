@@ -19,16 +19,16 @@ from typing import Annotated
 
 from fastapi import FastAPI
 # ...
-from terser.hints import preserve_docstring
-
+from python_minifier.hints import preserve_docstring
 
 app = FastAPI()
+
 
 @preserve_docstring
 @app.get("/{path:path}", response_class=StreamingResponse)
 async def stream_parsed(
-    path: Annotated[str, Path()],
-    range_: Annotated[tuple[bool, int | str | None, int | str | None], Depends(...)],
+        path: Annotated[str, Path()],
+        range_: Annotated[tuple[bool, int | str | None, int | str | None], Depends(...)],
 ) -> AsyncGenerator[str]:
     """
     Returns parsed Markdown file via streaming response.
@@ -87,7 +87,8 @@ async def stream_parsed(
                     continue
                 elif flag & StatusFlag.INSIDE and not flag & StatusFlag.COMPLETE and node._id == end:
                     flag |= StatusFlag.COMPLETE
-                elif flag & StatusFlag.INSIDE and boundary and node._id != boundary and not node._id.startswith(boundary + "."):
+                elif flag & StatusFlag.INSIDE and boundary and node._id != boundary and not node._id.startswith(
+                        boundary + "."):
                     yield composed
                     for _line in composer.collect().splitlines(keepends=True):
                         if _line.startswith('\t</'):

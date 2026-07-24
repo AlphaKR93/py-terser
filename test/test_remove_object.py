@@ -3,8 +3,8 @@ import sys
 
 import pytest
 
-from terser._ast.compare import compare_ast
-from terser.transforms.remove_object_base import RemoveObject
+from python_minifier._ast.compare import compare_ast
+from python_minifier.transforms.remove_object_base import RemoveObject
 
 
 def test_remove_object_py3():

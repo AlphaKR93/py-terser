@@ -3,9 +3,9 @@ import sys
 
 import pytest
 
-from terser import unparse
-from terser._ast.compare import compare_ast
-from terser.transforms.remove_posargs import remove_posargs
+from python_minifier import unparse
+from python_minifier._ast.compare import compare_ast
+from python_minifier.transforms.remove_posargs import remove_posargs
 
 
 def test_pep():

@@ -3,11 +3,11 @@ import sys
 
 import pytest
 
-from terser import minify
-from terser._ast.annotation import add_parent
-from terser._ast.compare import compare_ast
-from terser.rename import add_namespace
-from terser.transforms.constant_folding import FoldConstants, equal_value_and_type
+from python_minifier import minify
+from python_minifier._ast.annotation import add_parent
+from python_minifier._ast.compare import compare_ast
+from python_minifier.rename import add_namespace
+from python_minifier.transforms.constant_folding import FoldConstants, equal_value_and_type
 
 def fold_constants(source):
     module = ast.parse(source)

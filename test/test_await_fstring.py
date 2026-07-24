@@ -3,8 +3,8 @@ import sys
 
 import pytest
 
-from terser import unparse
-from terser._ast.compare import compare_ast
+from python_minifier import unparse
+from python_minifier._ast.compare import compare_ast
 
 
 def test_await_fstring():

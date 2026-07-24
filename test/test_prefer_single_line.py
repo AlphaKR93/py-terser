@@ -4,9 +4,9 @@ import sys
 import os
 import tempfile
 
-from terser import minify, unparse
-from terser._ast.annotation import add_parent
-from terser.rename import add_namespace
+from python_minifier import minify, unparse
+from python_minifier._ast.annotation import add_parent
+from python_minifier.rename import add_namespace
 
 from subprocess_compat import run_subprocess, safe_decode
 
@@ -169,7 +169,7 @@ def test_cli_default_uses_newlines():
 
     try:
         result = run_subprocess([
-            sys.executable, '-m', 'terser', temp_file
+            sys.executable, '-m', 'python_minifier', temp_file
         ], timeout=30)
 
         assert result.returncode == 0
@@ -190,7 +190,7 @@ def test_cli_prefer_single_line_flag():
 
     try:
         result = run_subprocess([
-            sys.executable, '-m', 'terser',
+            sys.executable, '-m', 'python_minifier',
             '--prefer-single-line', temp_file
         ], timeout=30)
 
@@ -207,7 +207,7 @@ def test_cli_stdin_prefer_single_line():
     expected = 'a=1;b=2;c=3'
 
     result = run_subprocess([
-        sys.executable, '-m', 'terser',
+        sys.executable, '-m', 'python_minifier',
         '--prefer-single-line', '-'
     ], input_data=code, timeout=30)
 

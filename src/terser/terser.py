@@ -1,225 +1,68 @@
-from terser.config import TerserConfig
-from terser.pipeline import Pipeline, UnstableMinification
-from terser.transforms.remove_annotations_options import RemoveAnnotationsOptions
+from __future__ import annotations
 
-def minify(
-    source,
-    filename=None,
-    remove_annotations=RemoveAnnotationsOptions(),
-    remove_pass=True,
-    remove_literal_statements=False,
-    strict=True,
-    combine_imports=True,
-    hoist_literals=True,
-    rename_locals=True,
-    preserve_locals=None,
-    rename_globals=False,
-    preserve_globals=None,
-    remove_object_base=True,
-    convert_posargs_to_args=True,
-    preserve_shebang=True,
-    optimize=False,
-    remove_explicit_return_none=True,
-    remove_builtin_exception_brackets=True,
-    constant_folding=True,
-    prefer_single_line=False,
-    rename_map=None,
-    defines=None,
-    obfuscation_map=None,
-    module_name_map=None,
-    current_module_name=None,
-    user_modules=None,
-    ignore_all=False,
-    threads=4,
-    transform_passes=1,
-    remove_type_stmt=True,
-    simplify_dynamic_attrs=True,
-    simplify_fstring=True,
-    simplify_early_exit=True,
-    simplify_if_stmt=True,
-    convert_to_ternary=True,
-    convert_to_lambda=True,
-    inline_functions=True,
-    inline_int_flags=True,
-):
-    """
-    Minify a python module (Backwards compatible routing wrapper).
-    """
-    # Map remove_annotations
-    remove_ann = True
-    remove_var_ann = True
-    remove_ret_ann = True
-    remove_arg_ann = True
-    remove_cls_ann = False
-    if isinstance(remove_annotations, bool):
-        remove_ann = remove_annotations
-        remove_var_ann = remove_annotations
-        remove_ret_ann = remove_annotations
-        remove_arg_ann = remove_annotations
-        remove_cls_ann = remove_annotations
-    elif isinstance(remove_annotations, RemoveAnnotationsOptions):
-        remove_ann = (
-            remove_annotations.remove_variable_annotations or
-            remove_annotations.remove_return_annotations or
-            remove_annotations.remove_argument_annotations or
-            remove_annotations.remove_class_attribute_annotations
-        )
-        remove_var_ann = remove_annotations.remove_variable_annotations
-        remove_ret_ann = remove_annotations.remove_return_annotations
-        remove_arg_ann = remove_annotations.remove_argument_annotations
-        remove_cls_ann = remove_annotations.remove_class_attribute_annotations
+from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
-    filename = filename or 'terser.minify source'
-    if current_module_name is None and filename and filename != 'terser.minify source':
-        import os
-        abs_path = os.path.abspath(filename)
-        dirname, basename = os.path.split(abs_path)
-        name, ext = os.path.splitext(basename)
-        parts = [name]
-        curr_dir = dirname
-        while curr_dir:
-            if os.path.exists(os.path.join(curr_dir, '__init__.py')):
-                parent_dir, dir_name = os.path.split(curr_dir)
-                if not dir_name:
-                    break
-                parts.insert(0, dir_name)
-                curr_dir = parent_dir
-            else:
-                break
-        current_module_name = '.'.join(parts)
+from ._ast import ast, tree as _ast
+from .config import TerserConfig
+from .parse import preprocess, travel
+from ._utils.progress import ProgressReporter
 
-    # Instantiate config
-    config = TerserConfig(
-        threads=threads,
-        transform_passes=transform_passes,
-        fold_constants=constant_folding,
-        optimize=optimize,
-        defines=defines or {},
-        remove_docstrings=remove_literal_statements,
-        strict_docstrings=strict,
-        remove_annotations=remove_ann,
-        remove_variable_annotations=remove_var_ann,
-        remove_return_annotations=remove_ret_ann,
-        remove_argument_annotations=remove_arg_ann,
-        remove_class_attribute_annotations=remove_cls_ann,
-        remove_explicit_inherits=remove_object_base,
-        remove_type_stmt=remove_type_stmt,
-        remove_trailing_returns=remove_explicit_return_none,
-        simplify_posargs=convert_posargs_to_args,
-        simplify_dynamic_attrs=simplify_dynamic_attrs,
-        simplify_fstring=simplify_fstring,
-        simplify_early_exit=simplify_early_exit,
-        simplify_raise=remove_builtin_exception_brackets,
-        simplify_if_stmt=simplify_if_stmt,
-        convert_to_ternary=convert_to_ternary,
-        convert_to_lambda=convert_to_lambda,
-        hoist_literals=hoist_literals,
-        inline_functions=inline_functions,
-        inline_int_flags=inline_int_flags,
-        cleanup_imports=combine_imports,
-        rename_locals=rename_locals,
-        rename_globals=rename_globals,
-        preserve_locals=preserve_locals or [],
-        preserve_globals=preserve_globals or [],
-        ignore_all=ignore_all,
-        prefer_single_line=prefer_single_line,
-        preserve_shebang=preserve_shebang,
-        obfuscation_map=obfuscation_map,
-        rename_map=rename_map,
-        module_name_map=module_name_map,
-        current_module_name=current_module_name,
-        user_modules=user_modules or set()
-    )
-
-    pipeline = Pipeline(config)
-    result = pipeline.run_source(source, filename)
-    return result.code
-
-def unparse(module, prefer_single_line=False):
-    import terser._ast as ast
-    from terser.printer.module_printer import ModulePrinter
-    from terser._ast.compare import CompareError, compare_ast
-
-    assert isinstance(module, ast.Module)
-    printer = ModulePrinter(prefer_single_line=prefer_single_line)
-    printer(module)
-
-    try:
-        minified_module = ast.parse(printer.code, 'terser.unparse output')
-    except SyntaxError as syntax_error:
-        raise UnstableMinification(syntax_error, '', printer.code)
-
-    try:
-        compare_ast(module, minified_module)
-    except CompareError as compare_error:
-        raise UnstableMinification(compare_error, '', printer.code)
-
-    return printer.code
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
 
 
-def minify_project(
-    search_paths,
-    output=None,
-    in_place=False,
-    obfuscation_map_file=None,
-    no_tree_shake=False,
-    threads=4,
-    transform_passes=3,
-    combine_imports=True,
-    remove_pass=True,
-    remove_literal_statements=False,
-    strict=True,
-    remove_annotations=True,
-    remove_variable_annotations=True,
-    remove_return_annotations=True,
-    remove_argument_annotations=True,
-    remove_class_attribute_annotations=False,
-    hoist_literals=True,
-    rename_locals=True,
-    preserve_locals=None,
-    rename_globals=False,
-    preserve_globals=None,
-    remove_object_base=True,
-    convert_posargs_to_args=True,
-    preserve_shebang=True,
-    optimize=False,
-    remove_explicit_return_none=True,
-    remove_builtin_exception_brackets=True,
-    constant_folding=True,
-    prefer_single_line=False,
-    rename_map=None,
-    defines=None,
-    ignore_all=False,
-    remove_type_stmt=True,
-    simplify_dynamic_attrs=True,
-    simplify_fstring=True,
-    simplify_early_exit=True,
-    simplify_if_stmt=True,
-    convert_to_ternary=True,
-    convert_to_lambda=True,
-    inline_functions=True,
-    inline_int_flags=True,
-    verbose=False
+SOURCE_EXTENSIONS = (".py", ".pyw",)
+
+
+async def async_minify_project(
+    sources: Iterable[str],
+    config: TerserConfig,
+    reporter: ProgressReporter,
+    output: str | None = None,
+    mangling_map_file: str | None = None,
+    preserve_locals: Iterable[str] | None = None,
+    preserve_globals: Iterable[str] | None = None,
+    defines: Mapping[str, bool] | None = None,
+    strict: bool = False,
+    verbose: bool = False
 ):
     """
     Minify a Python project/directory.
     """
+    from anyio import Path
+
     import os
-    import ast
     import sys
     import json
-    from terser.transforms.module_obfuscator import ImportedNamesCollector
+    from python_minifier.transforms.module_obfuscator import ImportedNamesCollector
 
-    # Find all source files recursively
-    paths = []
-    for path_arg in search_paths:
-        if os.path.isdir(path_arg):
-            for root, _dirs, files in os.walk(path_arg, followlinks=True):
-                for file in files:
-                    if file.endswith(('.py', '.pyw')):
-                        paths.append(os.path.join(root, file))
-        else:
-            paths.append(path_arg)
+    paths = await travel(*sources, strict=strict, follow_symlinks=output is None)
+    del sources
+
+    with reporter.step("Parsing nodes") as step:
+        compile_args = {
+            "type_comments": False,
+            "feature_version": config.target_version,
+            "optimize":
+                2 if (config.optimize
+                      and config.remove_docstrings
+                      and not config.preserve_module_docstrings)
+                else None
+        }
+
+        async def process(args: tuple[Path, Path], /):
+            path, root = args
+            if not (await path.exists()):
+                raise FileNotFoundError(path)
+            elif not (await path.is_dir()):
+                raise IsADirectoryError(path)
+
+            source, shebang = preprocess(await path.read_text("utf-8"), defines, strict)
+            node = _ast.parse(source, str(fp), **compile_args)
+
+        with ThreadPoolExecutor(max_workers=config.threads) as executor:
+            executor.map(process, paths)
 
     # get_relative_components helper
     def get_relative_components(path, search_roots):
@@ -244,7 +87,6 @@ def minify_project(
         return None
 
     # module_name_map & user_modules generation
-    module_name_map = {}
     user_modules = set()
     preserved_components = set()
 
@@ -420,10 +262,10 @@ def minify_project(
         remove_cls_ann = remove_annotations
     elif isinstance(remove_annotations, RemoveAnnotationsOptions):
         remove_ann = (
-            remove_annotations.remove_variable_annotations or
-            remove_annotations.remove_return_annotations or
-            remove_annotations.remove_argument_annotations or
-            remove_annotations.remove_class_attribute_annotations
+                remove_annotations.remove_variable_annotations or
+                remove_annotations.remove_return_annotations or
+                remove_annotations.remove_argument_annotations or
+                remove_annotations.remove_class_attribute_annotations
         )
         remove_var_ann = remove_annotations.remove_variable_annotations
         remove_ret_ann = remove_annotations.remove_return_annotations
@@ -585,4 +427,3 @@ def minify_project(
             json.dump(all_mappings, f, indent=2)
 
     return results
-

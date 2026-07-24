@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 
 SUFFIXES = (".py", ".pyw",)
+FFI_SUFFIXES = (".so", ".dll", ".dylib", ".pyd",)
 
 @final
 class UnresolvedModule(spec.ModuleSpec):
@@ -138,6 +139,7 @@ class PathProvider(MutableSet[str]):
     __specs: dict[str, spec.ModuleSpec]
     __iter: set[spec.ModuleSpec]
     __roots: set[Path]
+    __ffi_files: set[Path]
 
     def __init__(self, paths: set[str]):
         self.__specs = {}
@@ -145,10 +147,15 @@ class PathProvider(MutableSet[str]):
         self.__queue = set() | paths
         self.__discarded = set()
         self.__roots = set()
+        self.__ffi_files = set()
 
     @property
     def specs(self):
         return self.__specs
+
+    @property
+    def ffi_files(self) -> set[Path]:
+        return self.__ffi_files
 
     @property
     def roots(self) -> set[Path]:
@@ -179,6 +186,9 @@ class PathProvider(MutableSet[str]):
             if not (await path.exists()):
                 raise FileNotFoundError(path)
             if not (await path.is_dir()):
+                if await self.__assert_ffi(path):
+                    self.__ffi_files.add(path)
+                    continue
                 if not await self.__assert_file(path):
                     continue
 
@@ -190,6 +200,9 @@ class PathProvider(MutableSet[str]):
             async for root, _, children in path.walk(follow_symlinks=not strict):
                 for child in children:
                     path_ = root / child
+                    if await self.__assert_ffi(path_):
+                        self.__ffi_files.add(path_)
+                        continue
                     if not await self.__assert_file(path_):
                         continue
 
@@ -229,6 +242,16 @@ class PathProvider(MutableSet[str]):
     def iter(self, /) -> Iterator[spec.ModuleSpec]:
         assert self.is_resolved, "Path provider is not resolved yet"
         return iter(self.__iter)
+
+    @staticmethod
+    async def __assert_ffi(path: Path):
+        if not (await path.is_file()):
+            return False
+
+        if path.suffix.lower() not in FFI_SUFFIXES:
+            return False
+
+        return True
 
     @staticmethod
     async def __assert_file(path: Path):

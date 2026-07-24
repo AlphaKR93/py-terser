@@ -19,6 +19,20 @@ def _doc_in_module(module):
         return True
 
 
+def _defines_dunder_doc(module):
+    # FLAGS = 0, this runs before resolver.resolve()/bind() - no binding info
+    # exists yet, so this has to be a plain structural scan for a module-level
+    # `__doc__ = ...` / `__doc__: ... = ...` assignment
+    for stmt in module.body:
+        if isinstance(stmt, ast.Assign) and any(isinstance(t, ast.Name) and t.id == '__doc__' for t in stmt.targets):
+            return True
+
+        if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name) and stmt.target.id == '__doc__':
+            return True
+
+    return False
+
+
 class RemoveLiteralStatements(SuiteTransformer):
     """
     Remove literal expressions from the code
@@ -37,10 +51,9 @@ class RemoveLiteralStatements(SuiteTransformer):
         return self.visit(node)
 
     def visit_Module(self, node):
-        for binding in node.bindings:
-            if binding.spec == '__doc__':
-                node.body = [self.visit(a) for a in node.body]
-                return node
+        if _defines_dunder_doc(node):
+            node.body = [self.visit(a) for a in node.body]
+            return node
 
         node.body = self.suite(node.body, parent=node)
         return node

@@ -1,4 +1,4 @@
-from terser.ast import ast, is_constant_node
+from terser.ast import ast, is_constant_node, ref
 from ._suite import SuiteTransformer
 
 
@@ -59,13 +59,23 @@ class RemoveDebug(SuiteTransformer):
         return False
 
     def suite(self, node_list, parent):
+        result = []
+        for node in node_list:
+            if self.__can_remove(node):
+                # An `else` branch is production code that must survive even when the
+                # `__debug__` branch itself is stripped.
+                if node.orelse:
+                    for stmt in node.orelse:
+                        ref(stmt).parent = parent
+                    result.extend(self.suite(node.orelse, parent))
+                continue
 
-        without_debug = [self.visit(a) for a in filter(lambda n: not self.__can_remove(n), node_list)]
+            result.append(self.visit(node))
 
-        if len(without_debug) == 0:
+        if len(result) == 0:
             if isinstance(parent, ast.Module):
                 return []
             else:
                 return [self.add_child(ast.Expr(value=ast.Num(0)), parent=parent)]
 
-        return without_debug
+        return result

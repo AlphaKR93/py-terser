@@ -1,12 +1,12 @@
 import asyncio
-from pathlib import Path
+from anyio import Path
 from typing import Any
 
 import pathspec
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
 
-from terser.config import TransformConfig
-from terser.terser import minify_project
+from .config import TransformConfig
+from .terser import minify_project
 
 
 class TerserBuildHook(BuildHookInterface):
@@ -54,13 +54,14 @@ class TerserBuildHook(BuildHookInterface):
         )
 
         out_dir = Path(self.directory) / ".terser_build"
-        out_dir.mkdir(parents=True, exist_ok=True)
+        out_dir._path.mkdir(parents=True, exist_ok=True)
 
         asyncio.run(
             minify_project(
-                roots,
                 config,
-                out_dir,
+                roots,
+                reporter=None,
+                output=out_dir,
                 hoist_literals=self.config.get("hoist_literals", True),
                 rename_locals=self.config.get("rename_locals", True),
                 preserve_locals=self.config.get("preserve_locals"),

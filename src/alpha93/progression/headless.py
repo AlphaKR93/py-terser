@@ -23,6 +23,10 @@ class HeadlessReporter(BaseReporter):
     def prepare(self, message: str):
         return self._base_step(message)
 
+    @override
+    def close(self):
+        pass
+
 
 @final
 class _EmptyStepContext(StepContext):

@@ -50,23 +50,21 @@ def minify(
     task: Task,
     source: str,
     spec: ModuleSpec | str,
+    /,
     config: TransformConfig,
     *,
     strict: bool = False,
     defines: dict[str, bool] | None = None,
+    rename: bool = True,
+    preserved_names: list[str] | None = None,
     hoist_literals: bool = True,
-    rename_locals: bool = True,
-    preserve_locals: list[str] | None = None,
 ) -> tuple[ast.Module, str | None]:
-    task.init(len=7)
-
     with task("Preprocessing sources"):
         source, shebang = preprocessor.preprocess(source, defines, strict)
 
     with task("Parsing AST"):
         module = parser.parse(source, spec, optimize=config.optimize)
 
-    with task("Applying transforms"):
         for transform in transforms.__transforms__:
             if not transform.is_enabled(config) or transform.FLAGS > 0:
                 continue
@@ -78,7 +76,7 @@ def minify(
         resolver.bind(module)
 
     cache = transforms.TransformCache(config)
-    for _ in task.range(config.passes, "Applying transforms"):
+    for _ in task("Applying transforms", range(config.passes)):
         for transform in transforms.__transforms__:
             if not transform.is_enabled(config) or transform.FLAGS > 1:
                 continue
@@ -92,10 +90,9 @@ def minify(
         if hoist_literals:
             mangler.hoist_literals(module)
 
-        if rename_locals:
-            mangler.mangle_locals(module, rename_locals, preserve_locals)
+        if rename:
+            mangler.mangle_locals(module, rename, preserved_names)
 
-    with task("Applying transforms"):
         for transform in transforms.__transforms__:
             if not transform.is_enabled(config) or transform.FLAGS > 2:
                 continue

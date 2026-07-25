@@ -1,29 +1,43 @@
-from .steps.context import BaseStepContext, IterableStep
+from abc import ABC, abstractmethod
+from enum import IntEnum
+from typing import TYPE_CHECKING
+
+from .abc import Reporter
+from .tasks import AsyncIterableTaskGroup, IterableTaskGroup
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterable, Iterable
 
 
-class Reporter:
-    def __call__(self, message):
-        return BaseStepContext()
+class BaseReporter(Reporter, ABC):
+    class Status(IntEnum):
+        CONFIGURING = 0
+        IN_PROGRESS = 1
 
-    def init(self, len):
-        pass
+    @abstractmethod
+    def _task_provider(self, message: str, /):
+        ...
 
-    def range(self, i, message):
-        return IterableStep(range(i))
+    @abstractmethod
+    def prepare(self, message: str):
+        ...
 
-    def progress(self, fraction: float):
-        pass
+    @abstractmethod
+    def init(self, /, **kwargs):
+        ...
 
+    @abstractmethod
+    def close(self):
+        ...
 
-class BaseReporter(Reporter):
-    def iter(self, iterable, message):
-        from .tasks.context import IterableTaskContext
-        return IterableTaskContext(iterable)
+    def __enter__(self):
+        return self
 
-    def aiter(self, iterable, message):
-        from .tasks.context import AsyncIterableTaskContext
-        return AsyncIterableTaskContext(iterable)
+    def __exit__(self, *__, **_):
+        self.close()
 
+    def iter(self, iterable: Iterable, message: str):
+        return IterableTaskGroup(self._task_provider(message), iterable)
 
-class HeadlessReporter(BaseReporter):
-    pass
+    def aiter(self, iterable: AsyncIterable, message: str):
+        return AsyncIterableTaskGroup(self._task_provider(message), iterable)

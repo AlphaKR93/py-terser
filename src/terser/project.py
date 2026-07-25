@@ -11,6 +11,7 @@ from ._minify import minify, unparse
 from ._pipeline import PathProvider, Pipeline, linker, mangler, transforms
 from ._pipeline.mangler.util import preserved_names
 from .ast import ref
+from .ast.ref._module import PackageSpec
 
 if TYPE_CHECKING:
     import ast
@@ -200,6 +201,11 @@ class ProjectMinifier(Pipeline):
 
             if self.__output is None:
                 dest = spec.path
+            elif isinstance(spec, PackageSpec):
+                # PackageSpec's dotted name doesn't include the "__init__" component,
+                # so it needs its own path instead of the generic name -> path mapping below.
+                dest = self.__output / str(spec).replace('.', Path.parser.sep) / spec.path.name
+                await dest.parent.mkdir(parents=True, exist_ok=True)
             else:
                 dest = self.__output / str(spec).replace('.', Path.parser.sep)
                 dest = dest.with_suffix(spec.path.suffix)
@@ -224,6 +230,7 @@ class ProjectMinifier(Pipeline):
         def wrap[T](func: Callable[[T], Awaitable[None]]) -> Callable[[T], Callable[[Task], Awaitable[None]]]:
             def wrapper(t: T) -> Callable[[Task], Awaitable[None]]:
                 async def runner(task: Task, /):
+                    getattr(task, "_test", lambda _: None)("")
                     await func(t)
                     task.done()
                 return runner

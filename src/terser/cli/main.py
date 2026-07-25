@@ -60,8 +60,8 @@ def main():
                 preserve_shebang=args.preserve_shebang,
                 prefer_single_line=args.prefer_single_line,
                 hoist_literals=args.mangling_options.hoist_literals,
-                rename_locals=args.mangling_options.rename_locals,
-                preserve_locals=local,
+                rename=args.mangling_options.rename_locals,
+                preserved_names=local,
             )
         except UnbeneficialMinificationError:
             # Use original source when minification isn't beneficial

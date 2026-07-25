@@ -98,7 +98,14 @@ class _TqdmTask(Task):
         phase, self.__cur = self.__ctx._tg.steps[self.__cur], self.__cur + 1
         return _TqdmStepContext(_Context(self.__pv, phase), message)
 
+    def _test(self, path: str):
+        self.__path = path
+        with self.__pv.active_lock:
+            self.__pv.active.append(self.__path)
+
     def done(self, /) -> None:
+        with self.__pv.active_lock:
+            self.__pv.active.remove(self.__path)
         self.__ctx.close()
 
 
@@ -113,6 +120,10 @@ class _TqdmTaskProvider(TaskProvider, _StateHolder):
             self.__parent.display(pos=0)
             self.__bar.display(pos=1)
 
+            active_str = f"Active ({len(self.active)}): "
+
+            self.__bar.display(active_str + ', '.join(self.active)[:120 - len(active_str)], pos=2)
+
     def end_status(self, /):
         pass
 
@@ -126,6 +137,9 @@ class _TqdmTaskProvider(TaskProvider, _StateHolder):
 
         self.__parent = parent
         self.__lock = Lock()
+
+        self.active_lock = Lock()
+        self.active = []
 
     def __enter__(self) -> None:
         self.__bar: tqdm = tqdm(total=len(self.__ctx._tg) * self.__ctx._tg.steps_size, leave=False)

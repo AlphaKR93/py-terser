@@ -264,7 +264,7 @@ class NameAssigner:
         return module
 
 
-def mangle_locals(module, rename_locals=True, preserve_locals=None):
+def mangle_locals(module: ast.Module, rename_locals: bool = True, preserved_names: list[str] | None = None):
     """
     Mangle locals/nonlocals - names bound in function and class namespaces
 
@@ -275,11 +275,11 @@ def mangle_locals(module, rename_locals=True, preserve_locals=None):
     :param module: The module to mangle locals in
     :type module: :class:`ast.Module`
     :param bool rename_locals: If local names may be renamed
-    :param preserve_locals: Local names to leave unchanged
-    :type preserve_locals: list[str] | None
+    :param preserved_names: Local names to leave unchanged
+    :type preserved_names: list[str] | None
     """
 
-    allow_rename_locals(module, rename_locals, preserve_locals)
+    allow_rename_locals(module, rename_locals, preserved_names)
 
     add_assigned(module)
 

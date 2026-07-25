@@ -163,8 +163,8 @@ class ProjectMinifier(Pipeline):
         def __run(task: Task, source: str, spec: ModuleSpec, /):
             local = sorted(preserved_names(str(spec), self.preserve_locals))
             return minify(
-                task, source, spec,
-                self.__config,
+                task, source, spec, self.__config,
+                link_imports=True,
                 hoist_literals=self.hoist_literals,
                 rename=self.rename_locals,
                 preserved_names=local,

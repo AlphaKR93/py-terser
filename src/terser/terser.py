@@ -1,4 +1,4 @@
-from alpha93.progression.tasks import Task
+from alpha93.progression.headless import _EmptyTaskProvider as _TaskProvider
 
 from ._minify import minify as __minify, unparse as __unparse
 from ._pipeline import transforms
@@ -42,7 +42,7 @@ def minify(
 
     :rtype: str
     """
-    module, shebang = __minify(Task(), source, DummySpec(path), config, **kwargs)
+    module, shebang = __minify(_TaskProvider.EmptyTask(), source, DummySpec(path), config, **kwargs)
 
     cache = transforms.TransformCache(config)
     for _ in range(config.passes):

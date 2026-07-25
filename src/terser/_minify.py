@@ -53,12 +53,15 @@ def minify(
     /,
     config: TransformConfig,
     *,
+    link_imports: bool = False,
     strict: bool = False,
     defines: dict[str, bool] | None = None,
     rename: bool = True,
     preserved_names: list[str] | None = None,
     hoist_literals: bool = True,
 ) -> tuple[ast.Module, str | None]:
+    getattr(task, "_test", lambda _: None)(str(spec))
+
     with task("Preprocessing sources"):
         source, shebang = preprocessor.preprocess(source, defines, strict)
 
@@ -73,7 +76,7 @@ def minify(
 
     with task("Resolving names"):
         resolver.resolve(module)
-        resolver.bind(module)
+        resolver.bind(module, link_imports=link_imports)
 
     cache = transforms.TransformCache(config)
     for _ in task("Applying transforms", range(config.passes)):

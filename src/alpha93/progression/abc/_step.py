@@ -15,12 +15,18 @@ class StepContext(ABC):
     def __next__(self) -> None:
         ...
 
-    @abstractmethod
-    def __exit__[E: BaseException, T: TracebackType](
+    @final
+    def __exit__(
         self,
-        exc_type: type[E] | None,
-        exc: E | None,
-        tb_type: T | None
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb_type: TracebackType | None
+    ) -> None:
+        self._exit(exc, exc_type, tb_type)
+
+    @abstractmethod
+    def _exit[E: BaseException, T: TracebackType](
+        self, exc: E | None, exc_type: type[E] | None, tb_type: T | None, /
     ) -> None:
         ...
 
@@ -37,6 +43,7 @@ class Step(ABC):
 class BaseStep(Step):
     def __enter__(self):
         self._ctx.__enter__()
+        next(self._ctx)
 
     def __exit__(self, *args, **kwargs):
         self._ctx.__exit__(*args, **kwargs)
@@ -49,8 +56,8 @@ class IterableStep[T](Step):
     def __iter__(self) -> Iterator[T]:
         with self._ctx:
             for i in self.__iterable:
-                yield i
                 next(self._ctx)
+                yield i
 
 class AsyncIterableStep[T](Step):
     def __init__(self, ctx: StepContext, iterable: AsyncIterable[T]):
@@ -60,5 +67,5 @@ class AsyncIterableStep[T](Step):
     async def __aiter__(self) -> AsyncIterator[T]:
         with self._ctx:
             async for i in self.__iterable:
-                yield i
                 next(self._ctx)
+                yield i

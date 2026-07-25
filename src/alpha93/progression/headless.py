@@ -1,9 +1,8 @@
 from typing import final, override
 
-from alpha93.progression import Task
-from alpha93.progression.reporter import BaseReporter
-from alpha93.progression.steps import StepContext
-from alpha93.progression.tasks import TaskProvider
+from .abc import StepContext
+from .reporter import BaseReporter
+from .tasks import Task, TaskProvider
 
 
 @final
@@ -17,7 +16,7 @@ class HeadlessReporter(BaseReporter):
         return _EmptyTaskProvider()
 
     @override
-    def init(self) -> None:
+    def init(self, /, **kwargs) -> None:
         pass
 
     @override
@@ -36,7 +35,7 @@ class _EmptyStepContext(StepContext):
         pass
 
     @override
-    def __exit__(self, *args, **kwargs) -> None:
+    def _exit(self, *args, **kwargs) -> None:
         pass
 
 
@@ -44,15 +43,23 @@ class _EmptyStepContext(StepContext):
 class _EmptyTaskProvider(TaskProvider):
     @final
     class EmptyTask(Task):
+        @override
         def _step_context(self, message: str, /):
             return _EmptyStepContext()
 
+        @override
+        def done(self, /) -> None:
+            pass
+
+    @override
     def __enter__(self) -> None:
         pass
 
-    def __exit__(self, *args, **kwargs):
+    @override
+    def _exit(self, *args, **kwargs):
         pass
 
-    def task(self):
+    @override
+    def _task(self):
         # noinspection argument-list
         return _EmptyTaskProvider.EmptyTask()

@@ -3,10 +3,9 @@ from typing import TYPE_CHECKING, final
 
 from .reporter import Reporter
 
-from types import TracebackType
-
 if TYPE_CHECKING:
     from collections.abc import AsyncIterable, AsyncIterator, Iterable, Iterator
+    from types import TracebackType
 
 
 class TaskProvider(ABC):
@@ -14,19 +13,28 @@ class TaskProvider(ABC):
     def __enter__(self) -> None:
         ...
 
-    @abstractmethod
+    @final
     def __exit__(
-        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
-    ):
-        ...
-
-    @abstractmethod
-    def task(self) -> Task:
-        ...
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb_type: TracebackType | None
+    ) -> None:
+        self._exit(exc, exc_type, tb_type)
 
     @final
     def __next__(self) -> Task:
-        return self.task()
+        return self._task()
+
+    @abstractmethod
+    def _task(self) -> Task:
+        ...
+
+    @abstractmethod
+    def _exit[E: BaseException, T: TracebackType](
+        self, exc: E | None, exc_type: type[E] | None, tb_type: T | None, /
+    ) -> None:
+        ...
 
 
 class TaskGroup(ABC):
@@ -60,4 +68,6 @@ class AsyncIterableTaskGroup[T](TaskGroup):
 
 
 class Task(Reporter, ABC):
-    pass
+    @abstractmethod
+    def done(self, /) -> None:
+        ...

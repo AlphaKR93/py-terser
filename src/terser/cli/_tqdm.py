@@ -1,126 +1,206 @@
+from abc import ABC, abstractmethod
+from threading import Lock
+from typing import override
+
 from tqdm import tqdm
 
-from alpha93.progression.reporter import BaseReporter
-from alpha93.progression.steps.context import BaseStepContext
-from alpha93.progression.steps.step import Step
-from alpha93.progression.tasks.task import Task
+from alpha93.progression import BaseReporter, StepContext, Task, TaskProvider
+from alpha93.progression.abc import BaseStep
+from terser.utils.cli_helper import TqdmDebugTaskGraph
 
 
-class TqdmReporter(BaseReporter):
-    """
-    Reports progress on a single overall tqdm bar, split into `len` equal-weight phases.
+class _StateHolder(ABC):
+    @abstractmethod
+    def set_status(self, status: str):
+        ...
 
-    Individual steps/tasks don't get their own bars - with many modules processed
-    concurrently, one bar per step/task made dozens of bars race for the same terminal
-    lines and appear to spawn endlessly. Instead, the one bar fills in fractionally as a
-    phase's items are consumed (for synchronous `iter`/`range`), and its description
-    tracks the current phase's message - concurrently-processed work handed out via
-    `aiter` has no meaningful per-item completion signal to show here, so that phase just
-    displays its message and the bar jumps to the next phase once it's done.
-    """
+    @abstractmethod
+    def update(self, n: int, /):
+        ...
+
+    @abstractmethod
+    def end_status(self, /):
+        ...
+
+
+class _Context[T: TqdmDebugTaskGraph.Step]:
+    def __init__(self, reporter: _StateHolder, tg: T, /):
+        self.__ctx = reporter
+        self._tg = tg
+
+        self._cur = 0
+
+    def enter(self, message: str):
+        self.__ctx.set_status(message)
+
+    def next(self):
+        self._cur += 1
+        self.__ctx.update(1)
+
+    def close(self):
+        self.__ctx.end_status()
+        if (len(self._tg) <= 1) or (len(self._tg) - self._cur <= 1):
+            return
+        self.__ctx.update(len(self._tg) - self._cur - 1)
+
+
+class _TaskContext(_Context[TqdmDebugTaskGraph.Task]):
+    def __init__(self, reporter: _TqdmTaskProvider, context: _Context, /):
+        self.__holder = reporter
+        super().__init__(reporter, context._tg)
+
+    def close(self):
+        self.__holder.update(1)
+        self.__holder.close_task()
+
+
+class _TqdmPrepareStepContext(StepContext):
+    def __init__(self, reporter: _StateHolder, message: str, /):
+        self.__ctx = reporter
+        self.__msg = message
+        self.__lock = False
+
+    def __enter__(self):
+        self.__ctx.set_status(self.__msg)
+
+    def __next__(self):
+        if self.__lock:
+            raise NotImplementedError
+        self.__lock = True
+
+    def _exit(self, *__, **_) -> None:
+        pass
+
+
+class _TqdmStepContext(StepContext):
+    def __init__(self, context: _Context, message: str, /):
+        self.__ctx = context
+        self.__msg = message
+
+    def __enter__(self):
+        self.__ctx.enter(message=self.__msg)
+
+    def __next__(self):
+        self.__ctx.next()
+
+    def _exit(self, *__, **_) -> None:
+        self.__ctx.close()
+
+
+class _TqdmTask(Task):
+    def __init__(self, pv: _TqdmTaskProvider, i: int, context: _TaskContext, /):
+        self.__pv = pv
+        self.__id = i
+        self.__ctx = context
+        self.__cur = 0
+
+    def _step_context(self, message: str, /) -> StepContext:
+        phase, self.__cur = self.__ctx._tg.steps[self.__cur], self.__cur + 1
+        return _TqdmStepContext(_Context(self.__pv, phase), message)
+
+    def done(self, /) -> None:
+        self.__ctx.close()
+
+
+class _TqdmTaskProvider(TaskProvider, _StateHolder):
+    def set_status(self, status: str):
+        pass
+
+    def update(self, n: int, /):
+        with self.__parent.get_lock():
+            with self.__lock:
+                self.__bar.n += n
+            self.__parent.display(pos=0)
+            self.__bar.display(pos=1)
+
+    def end_status(self, /):
+        pass
+
+    def close_task(self, /):
+        self.__ctx.next()
+
+    def __init__(self, context: _Context[TqdmDebugTaskGraph.Task], parent: tqdm, message: str, /):
+        self.__ctx = context
+        self.__msg = message
+        self.__cur = 0
+
+        self.__parent = parent
+        self.__lock = Lock()
+
+    def __enter__(self) -> None:
+        self.__bar: tqdm = tqdm(total=len(self.__ctx._tg) * self.__ctx._tg.steps_size, leave=False)
+        self.__ctx.enter(self.__msg)
+
+    # noinspection argument-list,bad-return
+    def _task(self) -> Task:
+        task, self.__cur = _TqdmTask(self, self.__cur, _TaskContext(self, self.__ctx)), self.__cur + 1
+        return task
+
+    def _exit(self, *__, **_) -> None:
+        self.__bar.clear()
+        self.__bar.close()
+        self.__ctx._cur = self.__cur
+        self.__ctx.close()
+
+
+class TqdmReporter(BaseReporter, _StateHolder):
+    __tg: TqdmDebugTaskGraph
+    __bar: tqdm
+
+    __phase: int
+    __step: TqdmDebugTaskGraph.Step | None
 
     def __init__(self):
-        self._bar = None
-        self._phase = 0
-        self._total = 0
+        self.__bar: tqdm = tqdm()
+        self.__phase = 0
 
-    def init(self, len):
-        self._total = len
-        self._bar = tqdm(total=100, unit="%", leave=True)
+    def set_status(self, status: str):
+        self.__bar.set_description_str(status)
 
-    def _set_n(self, phases_done: float):
-        self._bar.n = round(100 * phases_done / self._total)
-        self._bar.refresh()
+    def update(self, n: int, /):
+        with self.__bar.get_lock():
+            self.__bar.update(n)
 
-    def _enter_phase(self, message) -> bool:
-        """Advance to the next phase; returns True if this is the last one."""
+    def end_status(self, /):
+        assert self.__step is not None
+        del self.__step
+        self.__step = None
+        self.__bar.display('', pos=1)
+        self.__bar.display(pos=0)
 
-        if self._bar is None:
-            return False
+    @override
+    def prepare(self, message: str):
+        return BaseStep(_TqdmPrepareStepContext(self, message))
 
-        self._bar.set_description(message)
-        self._set_n(self._phase)
-        self._phase += 1
-        return self._phase >= self._total
+    @override
+    def init(self, /, **kwargs):
+        self.__tg: TqdmDebugTaskGraph = kwargs["task_graph"]
+        self.__bar.total = len(self.__tg)
+        self.__bar.reset(len(self.__tg))
+        self.__step = None
 
-    def _set_fraction(self, fraction: float):
-        if self._bar is None:
-            return
-        self._set_n((self._phase - 1) + fraction)
+    @override
+    def _step_context(self, message: str, /) -> StepContext:
+        phase, self.__phase = self.__tg.steps[self.__phase], self.__phase + 1
+        if isinstance(phase, TqdmDebugTaskGraph.Task):
+            raise TypeError(f"Expected a Step graph, got {phase.__class__.__name__}")
 
-    def progress(self, fraction: float):
-        self._set_fraction(fraction)
+        assert self.__step is None
+        self.__step = phase
+        return _TqdmStepContext(_Context(self, phase), message)
 
-    def _finish(self):
-        if self._bar is None:
-            return
-        self._bar.n = 100
-        self._bar.refresh()
-        self._bar.close()
-        self._bar = None
+    @override
+    def _task_provider(self, message: str, /) -> TaskProvider:
+        phase, self.__phase = self.__tg.steps[self.__phase], self.__phase + 1
+        if not isinstance(phase, TqdmDebugTaskGraph.Task):
+            raise TypeError(f"Expected a SubTask graph, got {phase.__class__.__name__}")
 
-    def __call__(self, message):
-        return _StepContext(self, self._enter_phase(message))
+        assert self.__step is None
+        self.__step = phase
+        return _TqdmTaskProvider(_Context(self, phase), self.__bar, message)
 
-    def range(self, i, message):
-        return _FractionalStep(self, i, self._enter_phase(message))
-
-    def iter(self, iterable, message):
-        return _FractionalTaskIter(self, list(iterable), self._enter_phase(message))
-
-    def aiter(self, iterable, message):
-        return _PassthroughTaskAiter(self, iterable, self._enter_phase(message))
-
-
-class _StepContext(BaseStepContext):
-    def __init__(self, reporter: TqdmReporter, is_last: bool):
-        self._reporter = reporter
-        self._is_last = is_last
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        super().__exit__(exc_type, exc_val, exc_tb)
-        if self._is_last:
-            self._reporter._finish()
-
-
-class _FractionalStep:
-    def __init__(self, reporter: TqdmReporter, i: int, is_last: bool):
-        self._reporter = reporter
-        self._i = i
-        self._is_last = is_last
-
-    def __iter__(self):
-        total = self._i or 1
-        for idx in range(self._i):
-            yield Step(self), idx
-            self._reporter._set_fraction((idx + 1) / total)
-        if self._is_last:
-            self._reporter._finish()
-
-
-class _FractionalTaskIter:
-    def __init__(self, reporter: TqdmReporter, items: list, is_last: bool):
-        self._reporter = reporter
-        self._items = items
-        self._is_last = is_last
-
-    def __iter__(self):
-        total = len(self._items) or 1
-        for idx, value in enumerate(self._items):
-            yield Task(), value
-            self._reporter._set_fraction((idx + 1) / total)
-        if self._is_last:
-            self._reporter._finish()
-
-
-class _PassthroughTaskAiter:
-    def __init__(self, reporter: TqdmReporter, iterable, is_last: bool):
-        self._reporter = reporter
-        self._iterable = iterable
-        self._is_last = is_last
-
-    async def __aiter__(self):
-        for value in self._iterable:
-            yield Task(), value
-        if self._is_last:
-            self._reporter._finish()
+    @override
+    def close(self):
+        self.update(1)
+        self.__bar.display('', pos=1)
+        self.__bar.display(pos=0)

@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = [
     { name = "Alpha", email = "dev@alpha93.kr" }
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.14"
 dependencies = [
     "anyio>=4.14.2",
 ]
@@ -47,6 +47,7 @@ detect-string-imports = true
 preview = true
 
 [tool.ruff.lint]
+future-annotations = true
 ignore = [
     "E731",
 ]

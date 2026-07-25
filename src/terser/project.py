@@ -1,9 +1,10 @@
-import anyio
 import os
 import shutil
 from typing import TYPE_CHECKING
 
-from anyio import AsyncFile, Path, CapacityLimiter, to_thread
+import anyio
+from anyio import AsyncFile, CapacityLimiter, Path, to_thread
+
 from alpha93.progression import HeadlessReporter
 
 from ._minify import minify, unparse
@@ -17,8 +18,8 @@ if TYPE_CHECKING:
     from typing import Any
 
     from alpha93.progression import BaseReporter, Task
-
     from terser.ast.ref import ModuleRef, ModuleSpec
+
     from .config import TransformConfig
 
     type Awaitable[T] = Coroutine[Any, Any, T]
@@ -68,7 +69,9 @@ class ProjectMinifier(Pipeline):
 
         self.__pp = path_provider
         self.__reporter = reporter
-        self.__limiter = CapacityLimiter(total_tokens=workers or ((os.process_cpu_count() or 1) * 1.6))
+        self.__limiter = CapacityLimiter(total_tokens=workers or int(
+                (getattr(os, "process_cpu_count", os.cpu_count)() or 1) * 1.6
+        ))
 
         self.rename_locals = rename_locals
         self.preserve_locals = preserve_locals or {}
@@ -101,41 +104,62 @@ class ProjectMinifier(Pipeline):
         await cls(pp, config, reporter, output, *args, **kwargs)()
 
     async def __call__(self, /):
-        self.__reporter.init()
-        modules, project = await self.__minify_modules()
+        with self.__reporter.prepare("Calculating task graph"):
+            from terser.utils.cli_helper import TqdmDebugTaskGraph
+            m, f = len(self.__pp), len(self.__pp.ffi_files)
 
-        for module in self.__reporter("Linking", modules):
-            linker.link(module, project)
+            tg = TqdmDebugTaskGraph(
+                TqdmDebugTaskGraph.Task(m,
+                    TqdmDebugTaskGraph.Step(),
+                    TqdmDebugTaskGraph.Step(),
+                    TqdmDebugTaskGraph.Step(),
+                    TqdmDebugTaskGraph.IterableStep(self.__config.passes),
+                    TqdmDebugTaskGraph.Step(),
+                ),
+                TqdmDebugTaskGraph.IterableStep(m),
+                TqdmDebugTaskGraph.IterableStep(m * self.__config.passes),
+                TqdmDebugTaskGraph.IterableStep(m + 1),
+                TqdmDebugTaskGraph.Task(m + f),
+            )
+            del TqdmDebugTaskGraph, m, f
 
-        cache = transforms.TransformCache(self.__config)
-        modules_len = len(modules)
-        for j in self.__reporter("Applying transforms", range(self.__config.passes * len(modules))):
-            i = j % modules_len
-            for transform in transforms.__transforms__:
-                if not transform.is_enabled(self.__config) or transform.FLAGS > 2:
-                    continue
+        with self.__reporter as reporter:
+            reporter.init(task_graph=tg)
+            del tg
 
-                modules[i] = transform(cache)(modules[i])
+            modules, project = await self.__minify_modules()
 
-            if not i and not any(cache.passes.values()):
-                break
+            for module in self.__reporter("Linking", modules):
+                linker.link(module, project)
 
-        with self.__reporter("Mangling"):
+            cache = transforms.TransformCache(self.__config)
+            modules_len = len(modules)
+            for j in self.__reporter("Applying transforms", range(self.__config.passes * len(modules))):
+                i = j % modules_len
+                for transform in transforms.__transforms__:
+                    if not transform.is_enabled(self.__config) or transform.FLAGS > 2:
+                        continue
+
+                    modules[i] = transform(cache)(modules[i])
+
+                if not i and not any(cache.passes.values()):
+                    break
+
+            # for richer progress bar support
+            iter_ = iter(self.__reporter("Mangling", range(-1, modules_len)))
+            next(iter_)
             mangler.mangle_globals(project, self.rename_globals, self.preserve_globals)
 
-            for i in range(modules_len):
+            for i in iter_:
                 for transform in transforms.__transforms__:
                     if not transform.is_enabled(self.__config) or transform.FLAGS > 4:
                         continue
 
                     modules[i] = transform(cache)(modules[i])
 
-        await self.__dump_results(modules)
+            await self.__dump_results(modules)
 
     async def __minify_modules(self, /) -> tuple[list[ast.Module], dict[str, ModuleRef]]:
-        tasks = {(task, spec) for task, spec in self.__reporter.iter(self.__pp.iter(), "Compiling modules")}
-        modules: list = [None] * len(tasks)
-
         def __run(task: Task, source: str, spec: ModuleSpec, /):
             local = sorted(preserved_names(str(spec), self.preserve_locals))
             return minify(
@@ -146,15 +170,22 @@ class ProjectMinifier(Pipeline):
                 preserved_names=local,
             )
 
+        modules: list = [None] * len(self.__pp)
         async def __worker(i: int, task: Task, spec: ModuleSpec, /):
             source = await _read_async(spec.path, limiter=self.__limiter)
             module, _ = await to_thread.run_sync(__run, task, source, spec, limiter=self.__limiter)
             modules[i] = module
+            task.done()
 
         async with anyio.create_task_group() as tg:
-            for i, (task, spec) in enumerate(tasks):
+            # TODO: Cleanup this shit
+            j = len(self.__pp) - 1
+            for i, (task, spec) in enumerate(self.__reporter.iter(self.__pp.iter(), "Compiling modules")):
                 # noinspection async-call
-                tg.start_soon(__worker, i, task, spec)
+                t = tg.start_soon(__worker, i, task, spec)
+
+                if i == j:
+                    await t.wait()  # forcefully blocks the generator from finishing
 
         if not all(modules):
             raise RuntimeError("Failed to compile all modules")
@@ -171,6 +202,7 @@ class ProjectMinifier(Pipeline):
                 dest = spec.path
             else:
                 dest = self.__output / str(spec).replace('.', Path.parser.sep)
+                dest = dest.with_suffix(spec.path.suffix)
                 await dest.parent.mkdir(parents=True, exist_ok=True)
 
             source = await to_thread.run_sync(unparse, str(spec.path), None, node, self.prefer_single_line)
@@ -193,11 +225,16 @@ class ProjectMinifier(Pipeline):
             def wrapper(t: T) -> Callable[[Task], Awaitable[None]]:
                 async def runner(task: Task, /):
                     await func(t)
+                    task.done()
                 return runner
             return wrapper
 
         tasks = set(map(wrap(module), modules)) | set(map(wrap(binary), self.__pp.ffi_files))
         async with anyio.create_task_group() as tg:
-            for task, func in self.__reporter.iter(tasks, "Writing output"):
+            j = len(tasks) - 1
+            for i, (task, func) in enumerate(self.__reporter.iter(tasks, "Writing output")):
                 # noinspection async-call
-                tg.start_soon(func, task)
+                t = tg.start_soon(func, task)
+
+                if i == j:
+                    await t.wait()

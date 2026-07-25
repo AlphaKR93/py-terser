@@ -1,17 +1,14 @@
-from __future__ import print_function
-
 import argparse
 import os
 import sys
 
-from alpha93.argparse import arguments_from_model
-
 import terser
+
 from .._pipeline.mangler.util import preserved_names
 from ..exceptions import UnbeneficialMinificationError
+from ._argparse import arguments_from_model
 from ._argv import TerserArguments, TerserParsedArguments, parse_preserve
 from ._tqdm import TqdmReporter
-
 
 STDIN = '-'
 
@@ -43,7 +40,7 @@ def main():
     args = _argv()
 
     # for single files
-    if (paths_size := len(args.path)) >= 1:
+    if (paths_size := len(args.path)) <= 1 and (not paths_size or os.path.isfile(next(iter(args.path)))):
         if not paths_size or next(iter(args.path)) == STDIN:
             path = "<stdin>"
             source: str = sys.stdin.read()
@@ -80,6 +77,7 @@ def main():
     # Directories and multiple paths are minified as a project (whole-project name
     # resolution/linking), so route them separately.
     from functools import partial
+
     import anyio
 
     anyio.run(partial(terser.minify_project,

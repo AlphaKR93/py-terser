@@ -1,10 +1,9 @@
 from collections.abc import MutableSet
-from typing import TYPE_CHECKING, override, final
+from typing import TYPE_CHECKING, final, override
 
 from anyio import Path
 
 from terser.ast.ref import spec
-
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

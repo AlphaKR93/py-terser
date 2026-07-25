@@ -1,4 +1,6 @@
-from .headless import HeadlessReporter
+from .abc import StepContext
 from .reporter import BaseReporter
-from .steps import StepContext
-from .tasks import TaskProvider, Task
+from .tasks import Task, TaskProvider
+
+if True:
+    from alpha93.progression.headless import HeadlessReporter

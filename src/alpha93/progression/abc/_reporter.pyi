@@ -1,11 +1,8 @@
-from enum import IntEnum
-from typing import overload, final, Any, Never, override
-from collections.abc import Iterable, AsyncIterable
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterable, Iterable
+from typing import overload
 
-from .steps import BaseStep, IterableStep, AsyncIterableStep, Step, StepContext
-from .tasks import IterableTaskGroup, AsyncIterableTaskGroup, TaskProvider
-
+from ._step import AsyncIterableStep, BaseStep, IterableStep, Step, StepContext
 
 class Reporter(ABC):
     @overload
@@ -32,27 +29,4 @@ class Reporter(ABC):
         ...
 
     def _aiter_step[T](self, message: str, iterable: AsyncIterable[T]) -> AsyncIterableStep[T]:
-        ...
-
-class BaseReporter(Reporter, ABC):
-    class Status(IntEnum):
-        CONFIGURING = 0
-        IN_PROGRESS = 1
-
-    @abstractmethod
-    def _task_provider(self, message: str, /) -> TaskProvider:
-        ...
-
-    @abstractmethod
-    def prepare(self, message: str) -> BaseStep:
-        ...
-
-    @abstractmethod
-    def init(self) -> None:
-        ...
-
-    def iter[T](self, iterable: Iterable[T], message: str) -> IterableTaskGroup[T]:
-        ...
-
-    def aiter[T](self, iterable: AsyncIterable[T], message: str) -> AsyncIterableTaskGroup[T]:
         ...

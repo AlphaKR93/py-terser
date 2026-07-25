@@ -106,7 +106,8 @@ class _ModelArgumentBuilder:
             model = elem_types[0] if elem_types else str
 
         if isinstance(model, UnionType):
-            model = None
+            non_none = [t for t in get_args(model) if t is not type(None)]
+            model = non_none[0] if len(non_none) == 1 else None
 
         default = [] if action == "extend" else field_info.get_default(call_default_factory=True)
         parser.add_argument(

@@ -215,7 +215,8 @@ class ProjectMinifier(Pipeline):
             await _write_async(dest, source, limiter=self.__limiter)
 
         async def binary(path: Path, /):
-            assert self.__output
+            if self.__output is None:
+                return
 
             root = None
             for r in self.__pp.roots:

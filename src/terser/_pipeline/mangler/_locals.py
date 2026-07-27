@@ -99,7 +99,14 @@ def reserve_name(name, reservation_scope):
     """
 
     for namespace in reservation_scope:
-        ref(namespace).assigned_names.add(name)
+        namespace_ref = ref(namespace)
+        if not hasattr(namespace_ref, 'assigned_names'):
+            # namespace is no longer reachable from the module root (a transform deleted
+            # the subtree it belonged to) - nothing will ever rename anything in it, so
+            # there's nothing to reserve
+            continue
+
+        namespace_ref.assigned_names.add(name)
 
 
 def should_rename(binding, name, scope, is_available):
@@ -199,7 +206,16 @@ class NameAssigner:
 
         """
 
-        return all(name not in ref(namespace).assigned_names for namespace in reservation_scope)
+        def unreserved(namespace):
+            namespace_ref = ref(namespace)
+            if not hasattr(namespace_ref, 'assigned_names'):
+                # namespace is no longer reachable from the module root (a transform
+                # deleted the subtree it belonged to) - nothing reserves anything there
+                return True
+
+            return name not in namespace_ref.assigned_names
+
+        return all(unreserved(namespace) for namespace in reservation_scope)
 
     def assign(self, namespace, binding, *, prefix=''):
         """
@@ -218,6 +234,17 @@ class NameAssigner:
         scope = reservation_scope(namespace, binding)
 
         if binding.allow_rename:
+            # A binding may have already reserved its own current name in an earlier,
+            # separate pass (e.g. mangle_locals reserving every global's name so local
+            # mangling doesn't shadow it, before mangle_globals gets a turn at the same
+            # binding) - undo that self-reservation before checking availability, or
+            # `should_rename` sees its own name as "already taken" and force-renames it
+            # even when keeping it would be shorter.
+            for ns in scope:
+                ns_ref = ref(ns)
+                if hasattr(ns_ref, 'assigned_names'):
+                    ns_ref.assigned_names.discard(binding.name)
+
             name = self.available_name(scope, prefix=prefix)
 
             if should_rename(binding, name, scope, self.is_available):
@@ -248,7 +275,7 @@ class NameAssigner:
         return module
 
 
-def mangle_locals(module, rename_locals=True, preserve_locals=None):
+def mangle_locals(module: ast.Module, rename_locals: bool = True, preserved_names: list[str] | None = None):
     """
     Mangle locals/nonlocals - names bound in function and class namespaces
 
@@ -259,11 +286,11 @@ def mangle_locals(module, rename_locals=True, preserve_locals=None):
     :param module: The module to mangle locals in
     :type module: :class:`ast.Module`
     :param bool rename_locals: If local names may be renamed
-    :param preserve_locals: Local names to leave unchanged
-    :type preserve_locals: list[str] | None
+    :param preserved_names: Local names to leave unchanged
+    :type preserved_names: list[str] | None
     """
 
-    allow_rename_locals(module, rename_locals, preserve_locals)
+    allow_rename_locals(module, rename_locals, preserved_names)
 
     add_assigned(module)
 

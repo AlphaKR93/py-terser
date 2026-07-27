@@ -1,12 +1,29 @@
-import terser.ast.ast as ast
+from typing import TYPE_CHECKING, override
+
+from terser.ast import ast
+from ._suite import SuiteTransformer, TransformerFlag
+
+if TYPE_CHECKING:
+    from terser.config import TransformConfig
 
 
-def remove_posargs(node):
-    if isinstance(node, ast.arguments) and hasattr(node, 'posonlyargs'):
-        node.args = node.posonlyargs + node.args
-        node.posonlyargs = []
+class RemovePosArgs(SuiteTransformer):
+    """
+    Convert positional-only arguments to normal arguments
+    """
+    FLAGS = TransformerFlag.INFLUENCES_MANGLING
 
-    for child in ast.iter_child_nodes(node):
-        remove_posargs(child)
+    @override
+    @classmethod
+    def is_enabled(cls, config: "TransformConfig", /) -> bool:
+        return config.convert_posargs
 
-    return node
+    @override
+    def visit_arguments(self, node: ast.arguments):
+        node: ast.arguments = self.generic_visit(node)
+
+        if hasattr(node, 'posonlyargs') and node.posonlyargs:
+            node.args = node.posonlyargs + node.args
+            node.posonlyargs = []
+
+        return node

@@ -29,6 +29,17 @@ UnionConstructor: Any = UnionType
 LiteralGenericAlias = getattr(typing, "_LiteralGenericAlias")
 
 
+def _parse_bool(value: str) -> bool:
+    # `type=bool` is a classic argparse footgun: `bool("False")` is `True` (any
+    # non-empty string is truthy), so `--flag False` would silently become `True`.
+    if value.lower() in ("true", "1"):
+        return True
+    if value.lower() in ("false", "0"):
+        return False
+
+    raise argparse.ArgumentTypeError(f"invalid boolean value: {value!r}")
+
+
 class _ModelArgumentBuilder:
     __LOCK = object()
 
@@ -89,10 +100,20 @@ class _ModelArgumentBuilder:
             choices = [True, False]
         elif isinstance(model, LiteralGenericAlias):
             choices = get_args(model)
+            # `model` itself (the `Literal[...]` alias) isn't callable as a `type=`
+            # converter - convert to whatever type the literal's own values are instead.
+            model = type(choices[0])
         elif isinstance(model, EnumType):
             choices = list(model.__members__)
             if not len(choices):
                 choices = None
+
+        if isinstance(model, UnionType):
+            # Resolve `X | None` (e.g. `tuple[int, ...] | None`) to `X` before checking
+            # if it's a collection type below - `get_origin` on the union itself never
+            # matches `list`/`set`/`tuple`, so this has to happen first.
+            non_none = [t for t in get_args(model) if t is not type(None)]
+            model = non_none[0] if len(non_none) == 1 else None
 
         action, nargs = "store", None
         if get_origin(model) in (list, set, frozenset, tuple):
@@ -105,17 +126,13 @@ class _ModelArgumentBuilder:
             elem_types = get_args(model)
             model = elem_types[0] if elem_types else str
 
-        if isinstance(model, UnionType):
-            non_none = [t for t in get_args(model) if t is not type(None)]
-            model = non_none[0] if len(non_none) == 1 else None
-
         default = [] if action == "extend" else field_info.get_default(call_default_factory=True)
         parser.add_argument(
             "--" + field.replace('_', '-'),
             action=action,
             nargs=nargs,
             default=default,
-            type=model, # type: ignore[invalid-type]
+            type=_parse_bool if model is bool else model, # type: ignore[invalid-type]
             choices=choices,
             required=field_info.is_required(),
             help=field_info.description,

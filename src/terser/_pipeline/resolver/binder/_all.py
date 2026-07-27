@@ -25,7 +25,7 @@ def resolve_all(module: ast.Module):
         if not __is_assign(node):
             continue
 
-        if not isinstance(node.value, ast.List):
+        if not isinstance(node.value, (ast.List, ast.Tuple)):
             continue
 
         for el in node.value.elts:

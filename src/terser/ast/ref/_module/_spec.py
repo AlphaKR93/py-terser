@@ -44,7 +44,13 @@ class DummySpec(ModuleSpec):
 
     @override
     def resolve(self, module: str):
-        raise TypeError("Linking is not supported for single module")
+        # Cross-module linking isn't supported for a single module, but resolving an
+        # import's own dotted path (for qualified_name-based checks) doesn't need it -
+        # only reject imports that climb above this (nonexistent) module's root.
+        if module.startswith(".."):
+            raise ImportError(f"Could not resolve module: {module}")
+
+        return module[1:] if module.startswith(".") else module
 
 
 @final
@@ -76,7 +82,7 @@ class PackageSpec(ModuleSpec):
 
     def __init__(self, unresolved: ModuleSpec, parent: PackageSpec | None = None):
         assert str(unresolved).endswith(".__init__")
-        super().__init__(str(unresolved).rstrip(".__init__"))
+        super().__init__(str(unresolved).removesuffix(".__init__"))
         self.__path = unresolved.path.parent
         self.__parent = parent
         self.__children = {}

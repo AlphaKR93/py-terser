@@ -35,13 +35,29 @@ def scope_ref_nonlocal(node: ast.AST) -> ScopedNode:
     return ref(namespace)
 
 
+def is_python_mangled_private(name: str) -> bool:
+    """
+    Does Python's own compiler already private-name-mangle this identifier
+
+    A class-body name with at least two leading underscores and at most one trailing
+    underscore (e.g. `__foo`, but not `__foo__`) gets rewritten by the compiler to
+    `_ClassName__foo` wherever it's used inside that class - external code can't reach it
+    under its literal spelling without already knowing the mangled form, so terser
+    renaming it further doesn't lose anything Python wasn't already hiding.
+    """
+    return name.startswith('__') and not name.endswith('__')
+
+
 def arg_rename_in_place(node: ast.AST, /) -> bool:
     """
     Can this argument node by safely renamed
 
-    'self', 'cls', 'args', and 'kwargs' are not commonly referenced by the caller, so
-    can be safely renamed. Comprehension arguments are not accessible from outside, so
-    can be renamed.
+    'self' and 'cls' are not commonly referenced by the caller, so can be safely renamed.
+    Comprehension arguments are not accessible from outside, so can be renamed.
+
+    '*args'/'**kwargs' names are deliberately NOT renamed in place: code may introspect
+    them by name (e.g. `inspect.signature(f).parameters['extra']`), which renaming would
+    silently break.
 
     If the argument is positional-only, it can be safely renamed
 
@@ -69,10 +85,6 @@ def arg_rename_in_place(node: ast.AST, /) -> bool:
             ):
                 # mangler 'cls'
                 return True
-
-    if func.args.vararg is node or func.args.kwarg is node:
-        # starargs
-        return True
 
     if hasattr(func.args, "posonlyargs") and node in func.args.posonlyargs:
         return True

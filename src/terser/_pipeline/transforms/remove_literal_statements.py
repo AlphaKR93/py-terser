@@ -19,6 +19,20 @@ def _doc_in_module(module):
         return True
 
 
+def _defines_dunder_doc(module):
+    # FLAGS = 0, this runs before resolver.resolve()/bind() - no binding info
+    # exists yet, so this has to be a plain structural scan for a module-level
+    # `__doc__ = ...` / `__doc__: ... = ...` assignment
+    for stmt in module.body:
+        if isinstance(stmt, ast.Assign) and any(isinstance(t, ast.Name) and t.id == '__doc__' for t in stmt.targets):
+            return True
+
+        if isinstance(stmt, ast.AnnAssign) and isinstance(stmt.target, ast.Name) and stmt.target.id == '__doc__':
+            return True
+
+    return False
+
+
 class RemoveLiteralStatements(SuiteTransformer):
     """
     Remove literal expressions from the code
@@ -37,10 +51,9 @@ class RemoveLiteralStatements(SuiteTransformer):
         return self.visit(node)
 
     def visit_Module(self, node):
-        for binding in node.bindings:
-            if binding.spec == '__doc__':
-                node.body = [self.visit(a) for a in node.body]
-                return node
+        if _defines_dunder_doc(node):
+            node.body = [self.visit(a) for a in node.body]
+            return node
 
         node.body = self.suite(node.body, parent=node)
         return node
@@ -51,8 +64,19 @@ class RemoveLiteralStatements(SuiteTransformer):
 
         return is_constant_node(node.value, (ast.Num, ast.Str, ast.NameConstant, ast.Bytes))
 
+    def _is_docstring_position(self, node_list, index, parent):
+        # leave docstrings alone here - RemoveDocstrings decides whether to remove them
+        if index != 0 or not isinstance(parent, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            return False
+
+        node = node_list[0]
+        return isinstance(node, ast.Expr) and is_constant_node(node.value, ast.Str)
+
     def suite(self, node_list, parent):
-        without_literals = [self.visit(n) for n in node_list if not self.is_literal_statement(n)]
+        without_literals = [
+            self.visit(n) for i, n in enumerate(node_list)
+            if self._is_docstring_position(node_list, i, parent) or not self.is_literal_statement(n)
+        ]
 
         if len(without_literals) == 0:
             if isinstance(parent, ast.Module):

@@ -11,6 +11,7 @@ from ..resolver import bind_names, resolve_subtree
 from ..resolver.util import scope_ref_global
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from typing import Final, Self
 
     from terser.ast.ref import ContainsScope
@@ -33,6 +34,31 @@ class TransformCache:
 
     transforms: list[type[SuiteTransformer]] = field(default_factory=list)
     passes: dict[type[SuiteTransformer], bool] = field(default_factory=dict)
+    previous_passes: dict[type[SuiteTransformer], bool] = field(default_factory=dict)
+
+
+def apply_pass(cache: TransformCache, module: ast.Module, transform_types: Iterable[type[SuiteTransformer]], flags_max: TransformerFlag | int) -> ast.Module:
+    """
+    Apply every enabled transform up to `flags_max` once, recording per-transform
+    whether it changed the module into `cache.passes`.
+
+    Callers should loop this until `not any(cache.passes.values())` (nothing
+    changed this pass) or `config.passes` is reached - `SuiteTransformer.__new__`
+    uses `cache.passes`/`cache.previous_passes` to skip re-running a transform when
+    it has no new work: nothing earlier in `cache.transforms` changed the tree so far
+    this pass, and nothing from its own position onward changed it last pass either
+    (a change there hasn't been seen by this transform yet, since this round-robin
+    sweep hasn't reached it again).
+    """
+    cache.transforms = [t for t in transform_types if t.is_enabled(cache.config) and t.FLAGS <= flags_max]
+    cache.previous_passes = dict(cache.passes)
+
+    for transform in cache.transforms:
+        before = ast.dump(module)
+        module = transform(cache)(module)
+        cache.passes[transform] = ast.dump(module) != before
+
+    return module
 
 
 class SuiteTransformer(NodeVisitor, ABC):
@@ -58,10 +84,15 @@ class SuiteTransformer(NodeVisitor, ABC):
             return obj
 
         assert not set(ctx.transforms).difference(set(ctx.passes.keys()))
-        for i in range(ctx.transforms.index(cls)):
-            if ctx.passes[ctx.transforms[i]]:
-                break
-        else:
+        idx = ctx.transforms.index(cls)
+
+        # Something before me changed the tree already this pass, or something from my own
+        # position onward changed it last pass (a round-robin sweep, so a change there hasn't
+        # reached me again yet) - either way, there may be new work for me to do.
+        changed_before_this_pass = any(ctx.passes[t] for t in ctx.transforms[:idx])
+        changed_from_here_last_pass = any(ctx.previous_passes.get(t, True) for t in ctx.transforms[idx:])
+
+        if not changed_before_this_pass and not changed_from_here_last_pass:
             return lambda _: _  # type: ignore[ty:invalid-return-type]
 
         obj = super().__new__(cls)
@@ -225,7 +256,7 @@ class SuiteTransformer(NodeVisitor, ABC):
             :param node: The node to get the function namespace of
             """
 
-            if isinstance(node, (ast.FunctionDef, ast.Module, ast.AsyncFunctionDef)):
+            if isinstance(node, (ast.FunctionDef, ast.Module, ast.AsyncFunctionDef, ast.Lambda)):
                 return node
             return nearest_function_namespace(ref(node).parent)
 

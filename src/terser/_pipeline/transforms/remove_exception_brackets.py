@@ -8,8 +8,14 @@ When printed, this essentially removes the brackets from the exception name.
 We can't generally know if a name refers to an exception, so we only do this for builtin exceptions
 """
 
+from typing import TYPE_CHECKING, override
+
 from terser.ast import ast, ref
 from ..resolver.binding import BuiltinBinding
+from ._suite import SuiteTransformer, TransformerFlag
+
+if TYPE_CHECKING:
+    from terser.config import TransformConfig
 
 
 # These are always exceptions, in every version of python
@@ -101,18 +107,28 @@ def _remove_empty_call(binding: BuiltinBinding):
         ref(name_node).parent = raise_node
 
 
-def remove_no_arg_exception_call(module):
-    assert isinstance(module, ast.Module)
+class RemoveExceptionBrackets(SuiteTransformer):
+    """
+    Remove brackets with empty arguments from built-in exception raise statements
+    """
+    FLAGS = TransformerFlag.REQUIRES_MODULE_RESOLVE
 
-    for binding in module.bindings:
-        if not isinstance(binding, BuiltinBinding):
-            continue
+    @override
+    @classmethod
+    def is_enabled(cls, config: "TransformConfig", /) -> bool:
+        return config.remove_empty_exc_brackets
 
-        if binding.is_redefined():
-            continue
+    @override
+    def visit_Module(self, node):
+        for binding in ref(node).bindings:
+            if not isinstance(binding, BuiltinBinding):
+                continue
 
-        if binding.name in builtin_exceptions:
-            # We can remove any calls to builtin exceptions
-            _remove_empty_call(binding)
+            if binding.is_redefined():
+                continue
 
-    return module
+            if binding.name in builtin_exceptions:
+                # We can remove any calls to builtin exceptions
+                _remove_empty_call(binding)
+
+        return node

@@ -9,10 +9,11 @@ if TYPE_CHECKING:
     from ast import Module
 
 
-def bind(module: Module):
+def bind(module: Module, /, link_imports: bool = False):
     __resolve__all__(module)
     __mark_exports(module)
-    __resolve_imports(module)
+    if link_imports:
+        __resolve_imports(module)
     __bind(module)
 
 

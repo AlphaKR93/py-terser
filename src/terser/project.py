@@ -11,6 +11,7 @@ from ._minify import minify, unparse
 from ._pipeline import PathProvider, Pipeline, linker, mangler, transforms
 from ._pipeline.mangler.util import preserved_names
 from .ast import ref
+from .ast.ref._module import PackageSpec
 
 if TYPE_CHECKING:
     import ast
@@ -132,17 +133,16 @@ class ProjectMinifier(Pipeline):
             for module in self.__reporter("Linking", modules):
                 linker.link(module, project)
 
-            cache = transforms.TransformCache(self.__config)
+            # Each module gets its own TransformCache - cache.passes tracks per-transform
+            # "did this change the module" for SuiteTransformer.__new__'s skip-unchanged
+            # optimization, which is meaningless if shared across independent module trees.
+            caches = [transforms.TransformCache(self.__config) for _ in modules]
             modules_len = len(modules)
-            for j in self.__reporter("Applying transforms", range(self.__config.passes * len(modules))):
+            for j in self.__reporter("Applying transforms", range(self.__config.passes * modules_len)):
                 i = j % modules_len
-                for transform in transforms.__transforms__:
-                    if not transform.is_enabled(self.__config) or transform.FLAGS > 2:
-                        continue
+                modules[i] = transforms.apply_pass(caches[i], modules[i], transforms.__transforms__, 2)
 
-                    modules[i] = transform(cache)(modules[i])
-
-                if not i and not any(cache.passes.values()):
+                if not i and not any(any(cache.passes.values()) for cache in caches):
                     break
 
             # for richer progress bar support
@@ -151,6 +151,7 @@ class ProjectMinifier(Pipeline):
             mangler.mangle_globals(project, self.rename_globals, self.preserve_globals)
 
             for i in iter_:
+                cache = caches[i]
                 for transform in transforms.__transforms__:
                     if not transform.is_enabled(self.__config) or transform.FLAGS > 4:
                         continue
@@ -163,8 +164,8 @@ class ProjectMinifier(Pipeline):
         def __run(task: Task, source: str, spec: ModuleSpec, /):
             local = sorted(preserved_names(str(spec), self.preserve_locals))
             return minify(
-                task, source, spec,
-                self.__config,
+                task, source, spec, self.__config,
+                link_imports=True,
                 hoist_literals=self.hoist_literals,
                 rename=self.rename_locals,
                 preserved_names=local,
@@ -200,6 +201,11 @@ class ProjectMinifier(Pipeline):
 
             if self.__output is None:
                 dest = spec.path
+            elif isinstance(spec, PackageSpec):
+                # PackageSpec's dotted name doesn't include the "__init__" component,
+                # so it needs its own path instead of the generic name -> path mapping below.
+                dest = self.__output / str(spec).replace('.', Path.parser.sep) / spec.path.name
+                await dest.parent.mkdir(parents=True, exist_ok=True)
             else:
                 dest = self.__output / str(spec).replace('.', Path.parser.sep)
                 dest = dest.with_suffix(spec.path.suffix)
@@ -209,7 +215,8 @@ class ProjectMinifier(Pipeline):
             await _write_async(dest, source, limiter=self.__limiter)
 
         async def binary(path: Path, /):
-            assert self.__output
+            if self.__output is None:
+                return
 
             root = None
             for r in self.__pp.roots:
@@ -224,6 +231,7 @@ class ProjectMinifier(Pipeline):
         def wrap[T](func: Callable[[T], Awaitable[None]]) -> Callable[[T], Callable[[Task], Awaitable[None]]]:
             def wrapper(t: T) -> Callable[[Task], Awaitable[None]]:
                 async def runner(task: Task, /):
+                    getattr(task, "_test", lambda _: None)("")
                     await func(t)
                     task.done()
                 return runner

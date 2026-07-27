@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Annotated
 from alpha93.commons.pydantic import dataclasses
 from pydantic import BaseModel, ConfigDict, Field
 
-from terser.config import TransformConfig, RemoveAnnotationOptions
+from terser.config import TransformConfig, RemoveAnnotationOptions, RemoveDocstringOptions
 from ._argparse import MutuallyExclusive
 
 if TYPE_CHECKING:
@@ -109,8 +109,19 @@ class TerserParsedArguments(TerserArguments):
             remove_argument_annotations=namespace.remove_argument_annotations,
             remove_attribute_annotations=namespace.remove_attribute_annotations,
         )
+        remove_docstrings = RemoveDocstringOptions(
+            also_modules=namespace.also_modules,
+        )
         transform_options = TransformConfig(
+            passes=namespace.passes,
             optimize=namespace.optimize,
+            hint_modules=namespace.hint_modules,
+            # `--target-version` accumulates via the generic list-flag machinery, which
+            # defaults to `[]` - map that back to `None` (folding disabled) since an empty
+            # tuple isn't a meaningful version to fold `sys.version_info` comparisons against.
+            target_version=tuple(namespace.target_version) if namespace.target_version else None,
+            contracts=namespace.contracts,
+            apply_contracts=namespace.apply_contracts,
             remove_literal_statements=namespace.remove_literal_statements,
             combine_imports=namespace.combine_imports,
             remove_annotations=remove_annotations if namespace.remove_annotations else False,
@@ -118,9 +129,28 @@ class TerserParsedArguments(TerserArguments):
             remove_explicit_return_none=namespace.remove_explicit_return_none,
             fold_constants=namespace.fold_constants,
             remove_debug=namespace.remove_debug,
+            remove_asserts=namespace.remove_asserts,
             convert_pass=namespace.convert_pass,
+            unfold_iife_lambdas=namespace.unfold_iife_lambdas,
+            remove_type_statements=namespace.remove_type_statements,
+            convert_early_exits=namespace.convert_early_exits,
+            convert_to_inline=namespace.convert_to_inline,
+            convert_to_lambda=namespace.convert_to_lambda,
+            remove_dummy_assignments=namespace.remove_dummy_assignments,
+            remove_docstrings=remove_docstrings if namespace.remove_docstrings else False,
+            respect_all=namespace.respect_all,
+            cleanup_local_imports=namespace.cleanup_local_imports,
+            remove_typing_decorators=namespace.remove_typing_decorators,
+            remove_overloads=namespace.remove_overloads,
+            remove_generics=namespace.remove_generics,
+            remove_typing_classes=namespace.remove_typing_classes,
+            convert_typing_constructors=namespace.convert_typing_constructors,
+            convert_typing_extensions=namespace.convert_typing_extensions,
+            convert_dynamic_attribute_access=namespace.convert_dynamic_attribute_access,
             remove_empty_exc_brackets=namespace.remove_empty_exc_brackets,
             convert_posargs=namespace.convert_posargs,
+            remove_dunder_all=namespace.remove_dunder_all,
+            remove_dunder_all_modules=namespace.remove_dunder_all_modules,
         )
 
         mangling_options = ManglingOptions(

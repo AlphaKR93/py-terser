@@ -53,7 +53,7 @@ def minify(
     /,
     config: TransformConfig,
     *,
-    link_imports: bool = False,
+    link_imports: bool = True,
     strict: bool = False,
     defines: dict[str, bool] | None = None,
     rename: bool = True,

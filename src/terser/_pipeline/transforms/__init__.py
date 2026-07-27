@@ -28,6 +28,7 @@ from .remove_dead_blocks import RemoveDeadBlocks
 from .remove_exception_brackets import RemoveExceptionBrackets
 from .remove_posargs import RemovePosArgs
 from .remove_all import RemoveAll
+from .apply_constant_decorator import ApplyConstantDecorator
 
 
 __transforms__ = [
@@ -44,11 +45,12 @@ __transforms__ = [
     RemoveExplicitReturnNone,
     ConvertEarlyExits,
     ConvertToInline,
-    ConvertToLambda,
 
     # FLAGS = REQUIRES_IMPORT_RESOLVE
     Contracts,
+    ApplyConstantDecorator,
     RemoveAnnotations,
+    ConvertToLambda,
     RemoveDummyAssignments,
     RemoveDocstrings,
     CleanupLocalImports,

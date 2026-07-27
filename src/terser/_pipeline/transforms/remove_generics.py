@@ -1,6 +1,6 @@
 from typing import override
 
-from terser.ast import ast
+from terser.ast import ast, ref
 from terser.config import TransformConfig
 from terser.utils.imports import qualified_name
 from ._suite import SuiteTransformer, TransformerFlag
@@ -10,12 +10,27 @@ def _is_bare_generic(base: ast.expr) -> bool:
     return isinstance(base, (ast.Name, ast.Attribute)) and qualified_name(base) == "typing.Generic"
 
 
+def _is_subscripted_anywhere(binding) -> bool:
+    return any(isinstance(r, ast.Name) and isinstance(ref(r).parent, ast.Subscript) for r in binding.references)
+
+
+def _type_param_used_in_body(name: str, body: list[ast.stmt]) -> bool:
+    # Type params introduce a scope the whole class body (annotations, nested defs) can
+    # reference - dropping the declaration while it's still used elsewhere would leave a
+    # dangling name. Only a genuinely dead type param (never referenced anywhere) is safe
+    # to remove; err on the side of keeping it otherwise.
+    return any(isinstance(n, ast.Name) and n.id == name for stmt in body for n in ast.walk(stmt))
+
+
 class RemoveGenerics(SuiteTransformer):
     """
-    Remove bare (non-parametrized) `Generic` base classes.
+    Remove bare (non-parametrized) `Generic` base classes, and unused PEP 695
+    `class Foo[T]:` type params.
 
     `Generic[T]` is left alone - the subscript form has real runtime behavior
-    (`__class_getitem__`) that a bare `Generic` base doesn't add.
+    (`__class_getitem__`) that a bare `Generic` base doesn't add. Type params are only
+    dropped when the class isn't exported and isn't subscripted anywhere in this module -
+    `Foo[int]` relies on `__class_getitem__`, which type params are what provide.
     """
     FLAGS = TransformerFlag.REQUIRES_IMPORT_RESOLVE
 
@@ -28,4 +43,13 @@ class RemoveGenerics(SuiteTransformer):
     def visit_ClassDef(self, node: ast.ClassDef):
         node: ast.ClassDef = super().visit_ClassDef(node)
         node.bases = [b for b in node.bases if not _is_bare_generic(b)]
+
+        if getattr(node, 'type_params', None):
+            binding = ref(node).binding
+            if (
+                not binding.exported and not _is_subscripted_anywhere(binding)
+                and not any(_type_param_used_in_body(tp.name, node.body) for tp in node.type_params)
+            ):
+                node.type_params = []
+
         return node

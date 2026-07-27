@@ -1,10 +1,58 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/terser/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/terser"]
+
+[tool.hatch.build.targets.force-include]
+"src/alpha93/commons" = "alpha93/commons"
+"src/alpha93/progression" = "alpha93/progression"
+
+
 [project]
 name = "py-terser"
-version = "0.1.0"
-authors = [
-    { name = "Alpha", email = "dev@alpha93.kr" }
+description = "Fork of python-minifier: transform Python project into its most compact representation"
+keywords = ["minify", "minifier", "uglify", "uglifier", "mangler", "compressor"]
+authors = [{ name = "Alpha", email = "dev@alpha93.kr" }]
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE.md"]
+dynamic = ["version"]
+classifiers = [
+    "Environment :: Console",
+    "Environment :: Plugins",
+    "Framework :: Hatch",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Pre-processors",
+    "Topic :: Text Processing :: General",
+    "Topic :: Utilities",
+
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    #"Programming Language :: Python :: 3.15",  # TODO
+    "Programming Language :: Python :: Free Threading",
+    "Programming Language :: Python :: Free Threading :: 3 - Stable",
+    "Programming Language :: Python :: Implementation :: CPython",
+
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+
+    "Development Status :: 3 - Alpha",
 ]
-requires-python = ">=3.14"
+
+requires-python = ">=3.10"
 dependencies = [
     "anyio>=4.14.2",
     "hatchling>=1.17",
@@ -26,21 +74,21 @@ dev = [
     "ty>=0.0.61",
 ]
 
+
+[project.urls]
+source = "https://github.com/MadeByAlpha/py-terser.git"
+issues = "https://github.com/MadeByAlpha/py-terser/issues"
+
 [project.scripts]
 terser = "terser.cli:main"
 
 [project.entry-points.hatch]
 terser = "terser.hooks"
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/terser", "src/alpha93"]
 
 [tool.ruff]
 src = ["src"]
+target-version = "py314"    # INTENDED: due to type annotations
 show-fixes = true
 
 unsafe-fixes = true
@@ -56,5 +104,6 @@ ignore = [
     "E731",
 ]
 
-[tool.ty.src]
-root = "./src"
+[tool.ty.environment]
+root = ["./src"]
+python-version = "3.14"     # INTENDED: due to type annotations
